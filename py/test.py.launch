@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.python.pydev.debug.jythonLaunchConfigurationType">
+<stringAttribute key="bad_container_name" value="\hexbase\p"/>
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
+<listEntry value="/hexbase/py/test.py"/>
+</listAttribute>
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
+<listEntry value="1"/>
+</listAttribute>
+<stringAttribute key="org.eclipse.ui.externaltools.ATTR_LOCATION" value="${workspace_loc:hexbase/py/test.py}"/>
+<stringAttribute key="org.eclipse.ui.externaltools.ATTR_OTHER_WORKING_DIRECTORY" value=""/>
+<stringAttribute key="org.eclipse.ui.externaltools.ATTR_TOOL_ARGUMENTS" value=""/>
+<stringAttribute key="org.python.pydev.debug.ATTR_INTERPRETER" value="__default"/>
+<stringAttribute key="org.python.pydev.debug.ATTR_PROJECT" value="hexbase"/>
+<stringAttribute key="org.python.pydev.debug.vm.arguments" value="-ea -cp py/jython.jar;target/classes;lib/apache/*;lib/junit/*;lib/gson/*;lib/poi/*;lib/trove/*;lib/s3/*;lib/jama/*;lib/javassist.jar;lib/hadoop/cdh4/*;lib/jets3t/*"/>
+</launchConfiguration>

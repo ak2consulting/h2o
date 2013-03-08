@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+SEP=":"
+case "`uname`" in
+  CYGWIN*) SEP=";";;
+esac
+DEBUG=-agentlib:jdwp=transport=dt_socket,server=y,address=8000,suspend=n
+java $DEBUG -ea -cp ../target/h2o.jar$SEP../py/jython.jar H2OInit.Boot -mainClass org.python.util.jython $@

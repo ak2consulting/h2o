@@ -36,7 +36,8 @@ class Basic(unittest.TestCase):
     def test_E_ParseManyCols(self):
         csvPathname=h2o.find_file('smalldata/fail1_100x11000.csv.gz')
         parseKey = h2o_cmd.parseFile(None, csvPathname, timeoutSecs=10)
-        inspect = h2o_cmd.runInspect(None, parseKey['destination_key'], offset=-1, view=5)
+        # JSON is 1.7MB, takes forever to parse on Jython
+        h2o.nodes[0].inspect_no_json(parseKey['destination_key'])
 
     def test_F_StoreView(self):
         storeView = h2o.nodes[0].store_view()

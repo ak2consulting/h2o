@@ -1,5 +1,7 @@
 import h2o
-import webbrowser, re, getpass, urllib
+import re, getpass, urllib
+#from water.sys import Desktop
+from water.sys.Jython import browser
 # just some things useful for debugging or testing. pops the brower and let's you look at things
 # like the confusion matrix by matching the RFView json (h2o keeps the json history for us)
 
@@ -15,7 +17,7 @@ def browseTheCloud():
 
         # Open URL in new window, raising the window if possible.
         h2o.verboseprint("browseTheCloud:", cloud_url)
-        webbrowser.open_new(cloud_url)
+        browser.open(cloud_url)
 
 # match the first, swap the 2nd
 def browseJsonHistoryAsUrlLastMatch(matchme,swapme=None):
@@ -29,10 +31,6 @@ def browseJsonHistoryAsUrlLastMatch(matchme,swapme=None):
         url = h2o.json_url_history[i]
 
         # chop out the .json to get a browser-able url (can look at json too)
-        # Open URL in new window, raising the window if possible.
-        # webbrowser.open_new_tab(json_url)
-        # UPDATE: with the new API port, the browser stuff has .html
-        # but we've not switched everything to new. So do it selectively
 
         if swapme is not None: url = re.sub(matchme, swapme, url)
         url = re.sub("GLMGridProgress","GLMGridProgress.html",url)
@@ -41,7 +39,7 @@ def browseJsonHistoryAsUrlLastMatch(matchme,swapme=None):
 
         h2o.verboseprint("browseJsonHistoryAsUrlLastMatch:", url)
         h2o.verboseprint("same, decoded:", urllib.unquote(url))
-        webbrowser.open_new_tab(url)
+        browser.open(url)
 
 # maybe not useful, but something to play with.
 # go from end, backwards and see what breaks! (in json to html hack url transform)
@@ -63,5 +61,5 @@ def browseJsonHistoryAsUrl():
                 url = re.sub(".json",".html",url)
                 print "browseJsonHistoryAsUrl:", url
                 print "same, decoded:", urllib.unquote(url)
-                webbrowser.open(url)
+                browser.open(url)
                 tabCount += 1

@@ -124,7 +124,9 @@ function build_jar() {
 }
 function test_py() {
     echo "Running junit tests..."
-    python py/junit.py
+    cd py
+    sh jy junit.py
+    cd ..
 }
 
 clean

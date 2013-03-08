@@ -13,7 +13,7 @@ def find_config(base):
 
 # None means the json will specify, or the default for json below
 # only these two args override for now. can add more.
-def build_cloud_with_hosts(node_count=None, use_flatfile=None, 
+def build_cloud_with_hosts(node_count=None,
     use_hdfs=None, hdfs_name_node=None, hdfs_config=None,  hdfs_version=None,
     base_port=None,
     java_heap_GB=None, java_extra_args=None,
@@ -23,6 +23,7 @@ def build_cloud_with_hosts(node_count=None, use_flatfile=None,
     #   import h2o_config
 
     # allow user to specify the config json at the command line. config_json is a global.
+    # shouldn't need this??
     if h2o.config_json:
         configFilename = find_config(h2o.config_json)
     else:
@@ -44,11 +45,6 @@ def build_cloud_with_hosts(node_count=None, use_flatfile=None,
     offset = random.randint(0,31)
     basePort = hostDict.setdefault('base_port', 55300 + offset)
     username = hostDict.setdefault('username','0xdiag')
-    # stupid but here for clarity
-    password = hostDict.setdefault('password', None)
-    sigar = hostDict.setdefault('sigar', False)
-
-    useFlatfile = hostDict.setdefault('use_flatfile', False)
 
     useHdfs = hostDict.setdefault('use_hdfs', False)
     hdfsNameNode = hostDict.setdefault('hdfs_name_node', '192.168.1.151')
@@ -97,8 +93,8 @@ def build_cloud_with_hosts(node_count=None, use_flatfile=None,
     if base_port is not None:
         basePort = base_port
 
-    h2o.verboseprint("host config: ", username, password, 
-        h2oPerHost, basePort, sigar, useFlatfile, 
+    h2o.verboseprint("host config: ", username,
+        h2oPerHost, basePort,
         useHdfs, hdfsNameNode, hdfsVersion, hdfsConfig, javaHeapGB, use_home_for_ice,
         hostList, key_filename, aws_credentials, **kwargs)
 
@@ -114,7 +110,7 @@ def build_cloud_with_hosts(node_count=None, use_flatfile=None,
         hosts = []
         for h in hostList:
             h2o.verboseprint("Connecting to:", h)
-            hosts.append(h2o.RemoteHost(addr=h, username=username, password=password, key_filename=key_filename))
+            hosts.append(h2o.RemoteHost(addr=h, username=username, key_filename=key_filename))
    
     # handles hosts=None correctly
     h2o.write_flatfile(node_count=h2oPerHost, base_port=basePort, hosts=hosts)
@@ -130,8 +126,7 @@ def build_cloud_with_hosts(node_count=None, use_flatfile=None,
 
     # sandbox gets cleaned in build_cloud
     h2o.build_cloud(h2oPerHost,
-            base_port=basePort, hosts=hosts, timeoutSecs=timeoutSecs, sigar=sigar, 
-            use_flatfile=useFlatfile,
+            base_port=basePort, hosts=hosts, timeoutSecs=timeoutSecs,
             use_hdfs=useHdfs, hdfs_name_node=hdfsNameNode,
             hdfs_version=hdfsVersion, hdfs_config=hdfsConfig,
             java_heap_GB=javaHeapGB, java_extra_args=javaExtraArgs,

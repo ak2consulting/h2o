@@ -23,7 +23,7 @@ class Basic(unittest.TestCase):
         # just using one file for now
         for x in [1000]:
             shCmdString = "perl " + h2o.find_file("syn_scripts/parity.pl") + " 128 4 "+ str(x) + " quad"
-            h2o.spawn_cmd_and_wait('parity.pl', shCmdString.split(),4)
+            h2o.spawn_cmd_and_wait('parity.pl', shCmdString.split())
             csvFilename = "parity_128_4_" + str(x) + "_quad.data"  
 
         # always match the gen above!

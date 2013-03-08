@@ -1,28 +1,15 @@
-import h2o, h2o_cmd
-import h2o_browse as h2b
+# from H2OInit import Boot, External
+from water.sys.Jython import browser
+import h2o
+import h2o_cmd
 import time
-import psutil
-import webbrowser
-#import os, json, unittest, time, shutil, sys
-#sys.path.extend(['.','..','py'])
 
-try:
-    for proc in psutil.process_iter():
-      if proc.name == 'java.exe':
-        proc.kill()
-        
-    print 'Building cloud'
-    h2o.clean_sandbox()
-    #h2o.parse_our_args()
-    h2o.build_cloud(4, java_heap_GB=1, capture_output=False, classpath=True)
-    # h2o.nodes = [h2o.ExternalH2O()]
-    print 'KMeans'
-    file = csvPathname = h2o.find_file('smalldata/covtype/covtype.20k.data')
-    h2o_cmd.runKMeans(csvPathname=file, key='covtype', k=7)
-    print 'Web'
-    webbrowser.open("http://localhost:54323/Progress.html?destination_key=covtype.kmeans")
-except KeyboardInterrupt:
-    print 'Interrupted'
-finally:
-    print 'EAT THE BABIES'
-    # h2o.tear_down_cloud()
+# Boot.main([]);
+# key = External.makeKey("irisModel");
+
+print 'cypof'
+h2o.build_cloud_in_process()
+h2o_cmd.runKMeans(csvPathname='smalldata/covtype/covtype.20k.data', key='covtype', k=7)
+browser.open("http://localhost:54321/Inspect.html?key=covtype")
+time.sleep(1)
+h2o.tear_down_cloud()
