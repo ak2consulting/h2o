@@ -1,4 +1,4 @@
-package water.util;
+package water;
 
 import java.io.File;
 import java.io.FileWriter;

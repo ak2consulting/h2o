@@ -1,4 +1,4 @@
-package water.util;
+package water;
 
 import hex.GLMGridTest;
 
@@ -6,7 +6,6 @@ import java.awt.Desktop;
 import java.net.URI;
 import java.util.ArrayList;
 
-import water.*;
 import water.sys.*;
 
 public class TestRunner {

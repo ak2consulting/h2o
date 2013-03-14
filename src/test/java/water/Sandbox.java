@@ -1,12 +1,11 @@
-package water.util;
+package water;
 
 import java.awt.Desktop;
 import java.io.File;
 import java.net.URI;
 
-import water.*;
-import water.TestUtil;
 import water.parser.ParseDataset;
+import water.util.Utils;
 
 public class Sandbox {
   static final String USER = "cyprien";
