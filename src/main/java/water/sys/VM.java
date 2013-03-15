@@ -14,6 +14,8 @@ import water.Log;
 public abstract class VM {
   private final ArrayList<String> _args;
   private Process                 _process;
+  private boolean                 _inherit;
+  private File                    _out, _err;
 
   public VM(String[] args) {
     this(null, args);
@@ -44,14 +46,26 @@ public abstract class VM {
     return _process;
   }
 
+  public void inheritIO() {
+    _inherit = true;
+  }
+
+  public void persistIO(String out, String err) throws IOException {
+    _out = new File(out);
+    _err = new File(err);
+  }
+
   public void start() {
     ProcessBuilder builder = new ProcessBuilder(_args);
     try {
       _process = builder.start();
+      if( _inherit )
+        inheritIO(_process, null);
+      if( _out != null )
+        persistIO(_process, _out, _err);
     } catch( IOException e ) {
       throw new RuntimeException(e);
     }
-    inheritIO(_process, null);
   }
 
   public boolean isAlive() {
@@ -109,6 +123,11 @@ public abstract class VM {
     forward(process, header, process.getErrorStream(), System.err);
   }
 
+  public static void persistIO(Process process, File out, File err) throws IOException {
+    forward(process, null, process.getInputStream(), new PrintStream(out));
+    forward(process, null, process.getErrorStream(), new PrintStream(err));
+  }
+
   private static void forward(Process process, final String header, InputStream source, final PrintStream target) {
     final BufferedReader source_ = new BufferedReader(new InputStreamReader(source));
     Thread thread = new Thread() {
@@ -122,8 +141,7 @@ public abstract class VM {
               break;
 
             String s = header == null ? line : header + line;
-            // Log.write(target, s, header == null);
-            Log.write(s);
+            Log.unwrap(target, s);
           }
         } catch( IOException e ) {
           // Ignore, process probably done

@@ -1,6 +1,7 @@
 package water.sys;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -37,6 +38,16 @@ public class NodeHost implements Node {
 
   public Host host() {
     return _host;
+  }
+
+  @Override
+  public void inheritIO() {
+
+  }
+
+  @Override
+  public void persistIO(String outFile, String errFile) throws IOException {
+
   }
 
   @Override

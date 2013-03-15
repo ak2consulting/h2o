@@ -1,11 +1,13 @@
 package water.sys;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.*;
 import java.util.*;
 
-import water.*;
+import water.Boot;
+import water.TestUtil;
 
 /**
  * Creates a node in-process using a separate class loader.
@@ -18,7 +20,22 @@ public class NodeCL extends Thread implements Node {
   public NodeCL(String[] args) {
     _args = args;
     _classpath = getClassPath();
+    _initialClassLoader = Thread.currentThread().getContextClassLoader();
+    _classLoader = new URLClassLoader(_classpath, null);
+
     setDaemon(true);
+  }
+
+  @Override
+  public void inheritIO() {
+    // TODO add -id to PID?
+    // invoke(className, methodName, args)
+  }
+
+  @Override
+  public void persistIO(String outFile, String errFile) throws IOException {
+    // TODO
+    // invoke(className, methodName, args)
   }
 
   static URL[] getClassPath() {
@@ -49,49 +66,29 @@ public class NodeCL extends Thread implements Node {
 
   @Override
   public void run() {
-    run(true);
-  }
-
-  public void run(boolean close) {
-    _initialClassLoader = Thread.currentThread().getContextClassLoader();
-    _classLoader = new URLClassLoader(_classpath, null);
-    Thread.currentThread().setContextClassLoader(_classLoader);
-    Exception ex = null;
-
-    try {
-      Class c = _classLoader.loadClass(Boot.class.getName());
-      Method method = c.getMethod("main", new Class[] { String[].class });
-      method.invoke(null, (Object) _args);
-    } catch( Exception e ) {
-      Log.write(e);
-      ex = e;
-    }
-
-    Thread.currentThread().setContextClassLoader(_initialClassLoader);
-
-    if( ex != null && !(ex.getCause() instanceof InterruptedException) )
-      throw new RuntimeException(ex.getCause());
-
-    if( close )
-      kill();
+    invoke(Boot.class.getName(), "main", (Object) _args);
   }
 
   @Override
   public void kill() {
-    invoke(NodeCL.class.getName(), "close_", new Class[0]);
+    invoke(NodeCL.class.getName(), "close_");
   }
 
   public static void close_() {
     TestUtil.checkLeakedKeys();
   }
 
-  private Object invoke(String className, String methodName, Class[] argsTypes, Object... args) {
+  private Object invoke(String className, String methodName, Object... args) {
     assert Thread.currentThread().getContextClassLoader() == _initialClassLoader;
     Thread.currentThread().setContextClassLoader(_classLoader);
 
+    Class[] types = new Class[args.length];
+    for( int i = 0; i < args.length; i++ )
+      types[i] = args[i].getClass();
+
     try {
       Class<?> c = _classLoader.loadClass(className);
-      Method method = c.getMethod(methodName, argsTypes);
+      Method method = c.getMethod(methodName, types);
       method.setAccessible(true);
       return method.invoke(null, args);
     } catch( Exception ex ) {

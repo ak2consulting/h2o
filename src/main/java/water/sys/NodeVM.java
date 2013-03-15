@@ -7,6 +7,8 @@ import water.Log;
  * Creates a node in a VM.
  */
 public class NodeVM extends VM implements Node {
+  private String _out, _err;
+
   public NodeVM(String[] args) {
     this(null, args);
   }
@@ -14,6 +16,7 @@ public class NodeVM extends VM implements Node {
   public NodeVM(String[] javaArgs, String[] nodeArgs) {
     super(javaArgs, nodeArgs);
   }
+
 
   public static void main(String[] args) throws Exception {
     exitWithParent();

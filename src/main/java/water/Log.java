@@ -59,7 +59,7 @@ public final class Log {
   // Print to the original STDERR & die
   public static void die(String s) {
     System.err.println(s);
-    if(!_dontDie)
+    if( !_dontDie )
       System.exit(-1);
   }
 
@@ -80,7 +80,7 @@ public final class Log {
     }
   }
 
-  public static void write(PrintStream stream, String s, boolean headers) {
+  public static void unwrap(PrintStream stream, String s) {
     if( stream instanceof Wrapper )
       ((Wrapper) System.out).printlnParent(s);
     else

@@ -1,4 +1,3 @@
-# from H2OInit import Boot, External
 from water.sys.Jython import browser
 import h2o
 import h2o_cmd
