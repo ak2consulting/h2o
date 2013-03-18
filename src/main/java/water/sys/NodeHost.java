@@ -120,7 +120,6 @@ public class NodeHost implements Node {
       // list.add("-L");
       // list.add("8000:127.0.0.1:" + local);
       list.addAll(Arrays.asList(getArgs(args)));
-      System.out.println(host.address() + ": " + Arrays.toString(list.toArray()));
       exec(list);
     }
   }
