@@ -8,8 +8,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import water.api.Timeline;
-
 /**
  * A ByteBuffer backed mixed Input/OutputStream class.
  *
@@ -212,7 +210,7 @@ public final class AutoBuffer {
   // bytes out.  If the write is to an H2ONode and is short, send via UDP.
   // AutoBuffer close calls order; i.e. a reader close() will block until the
   // writer does a close().
-  public final int close() { 
+  public final int close() {
     assert _h2o != null || _chan != null;      // Byte-array backed should not be closed
     try {
       if( _chan == null ) {     // No channel?

@@ -3,10 +3,7 @@ package water.sys;
 import java.io.IOException;
 
 public interface Node {
-  /**
-   * Display out and err on parent's console with a header for each line.
-   */
-  void inheritIO();
+  String address();
 
   void persistIO(String outFile, String errFile) throws IOException;
 

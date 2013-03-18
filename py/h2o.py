@@ -3,7 +3,7 @@ import argparse, sys, unittest
 import glob
 import h2o_browse as h2b
 import re
-import random
+import random, copy
 # used in shutil.rmtree permission hack for windows
 import errno
 
@@ -11,13 +11,6 @@ from subprocess import Popen, PIPE
 from water.sys import Node, NodeCL, NodeVM, NodeHost, Host
 from water.sys.Jython import http
 from java.io import IOException
-
-# The cloud is uniquely named per user (only)
-# Fine to uniquely identify the flatfile by name only also?
-# Both are the user that runs the test. The config might have a different username on the
-# remote machine (0xdiag, say, or hduser)
-def flatfile_name():
-    return('pytest_flatfile-%s' %getpass.getuser())
 
 def cloud_name():
     return('pytest-%s-%s' % (getpass.getuser(), os.getpid()))
@@ -275,56 +268,6 @@ json_url_history = []
 global nodes
 nodes = []
 
-# I suppose we could shuffle the flatfile order!
-# but it uses hosts, so if that got shuffled, we got it covered?
-# the i in xrange part is not shuffled. maybe create the list first, for possible random shuffle
-# FIX! default to random_shuffle for now..then switch to not.
-def write_flatfile(node_count=2, base_port=54321, hosts=None, rand_shuffle=True):
-    # always create the flatfile. 
-    ports_per_node = 2
-    pff = open(flatfile_name(), "w+")
-    # doing this list outside the loops so we can shuffle for better test variation
-    hostPortList = []
-    if hosts is None:
-        ip = get_ip_address()
-        for i in range(node_count):
-            hostPortList.append("/" + ip + ":" + str(base_port + ports_per_node*i))
-    else:
-        for h in hosts:
-            for i in range(node_count):
-                hostPortList.append("/" + h.addr + ":" + str(base_port + ports_per_node*i))
-
-    # note we want to shuffle the full list of host+port
-    if rand_shuffle: 
-        random.shuffle(hostPortList)
-    for hp in hostPortList:
-        pff.write(hp + "\n")
-    pff.close()
-
-
-def check_port_group(base_port):
-    # UPDATE: don't do this any more
-    # for now, only check for jenkins or kevin
-    if (1==0):
-        username = getpass.getuser()
-        if username=='jenkins' or username=='kevin' or username=='michal':
-            # assumes you want to know about 3 ports starting at base_port
-            command1Split = ['netstat', '-anp']
-            command2Split = ['egrep']
-            # colon so only match ports. space at end? so no submatches
-            command2Split.append("(%s | %s | %s)" % (base_port, base_port+1, base_port+2) )
-            command3Split = ['wc','-l']
-
-            print "Checking 3 ports starting at ", base_port
-            print ' '.join(command2Split)
-
-            # use netstat thru subprocess
-            p1 = Popen(command1Split, stdout=PIPE)
-            p2 = Popen(command2Split, stdin=p1.stdout, stdout=PIPE)
-            p3 = Popen(command3Split, stdin=p2.stdout, stdout=PIPE)
-            output = p3.communicate()[0]
-            print output
-
 def default_hosts_file():
     return 'pytest_config-{0}.json'.format(getpass.getuser())
 
@@ -372,13 +315,8 @@ def build_cloud(node_count=2, base_port=54321, hosts=None,
         # if no hosts list, use psutil method on local host.
         totalNodes = 0
         # doing this list outside the loops so we can shuffle for better test variation
-        # this jvm startup shuffle is independent from the flatfile shuffle
         portList = [base_port + ports_per_node*i for i in range(node_count)]
         if hosts is None:
-            # if use_flatfile, we should create it, 
-            # because tests will just call build_cloud with use_flatfile=True
-            # best to just create it all the time..may or may not be used 
-            write_flatfile(node_count=node_count, base_port=base_port)
             hostCount = 1
             if rand_shuffle: random.shuffle(portList)
             for p in portList:
@@ -387,20 +325,17 @@ def build_cloud(node_count=2, base_port=54321, hosts=None,
                 node_list.append(newNode)
                 totalNodes += 1
         else:
-            # if hosts, the flatfile was created and uploaded to hosts already
-            # I guess don't recreate it, don't overwrite the one that was copied beforehand.
-            # we don't always use the flatfile (use_flatfile=False)
-            # Suppose we could dispatch from the flatfile to match it's contents
-            # but sometimes we want to test with a bad/different flatfile then we invoke h2o?
+            Host.rsync(hosts)
+
             hostCount = len(hosts)
-            hostPortList = []
+            host_port_list = []
             for h in hosts:
                 for port in portList:
-                    hostPortList.append( (h,port) )
-            if rand_shuffle: random.shuffle(hostPortList)
-            for (h,p) in hostPortList:
+                    host_port_list.append( (h,port) )
+            if rand_shuffle: random.shuffle(host_port_list)
+            for (h,p) in host_port_list:
                 verboseprint('starting remote node', totalNodes, 'via', h)
-                newNode = h.remote_h2o(port=p, node_id=totalNodes, **kwargs)
+                newNode = h.remote_h2o(port=p, node_id=totalNodes, host_port_list=host_port_list, **kwargs)
                 node_list.append(newNode)
                 totalNodes += 1
                 # kbn try delay between each one?
@@ -611,7 +546,7 @@ def stabilize_cloud(node, node_count, timeoutSecs=14.0, retryDelaySecs=0.25):
 
 class H2O(object):
     def __init__(self,
-        use_this_ip_addr=None, port=54321, capture_output=True, use_debugger=None,
+        use_this_ip_addr=None, port=54321, host_port_list=None, capture_output=True, use_debugger=None,
         use_hdfs=False, hdfs_root="/datasets",
         # hdfs_version="cdh4", hdfs_name_node="192.168.1.151",
         hdfs_version="cdh3u5", hdfs_name_node="192.168.1.176",
@@ -619,7 +554,7 @@ class H2O(object):
         # FIX not interesting any more?
         hdfs_nopreload=None,
         aws_credentials=None,
-        use_flatfile=False, java_heap_GB=None, java_extra_args=None, 
+        java_heap_GB=None, java_extra_args=None, 
         use_home_for_ice=False, node_id=None, username=None,
         random_udp_drop=False
         ):
@@ -627,6 +562,7 @@ class H2O(object):
         if use_debugger is None: use_debugger = debugger
         self.aws_credentials = aws_credentials
         self.port = port
+        self.host_port_list = host_port_list
         # None is legal for self.addr. means we won't give an ip to the jar when we start, and it should
         # figure out the right thing. Or we can say use use_this_ip_addr=127.0.0.1, or the known address 
         # if use_this_addr is None, use 127.0.0.1 for urls and json
@@ -646,7 +582,6 @@ class H2O(object):
         self.hdfs_config = hdfs_config
         self.hdfs_nopreload = hdfs_nopreload
 
-        self.use_flatfile = use_flatfile
         self.java_heap_GB = java_heap_GB
         self.java_extra_args = java_extra_args
 
@@ -662,7 +597,7 @@ class H2O(object):
     def __url(self, loc, port=None):
         # always use the new api port
         if port is None: port = self.port
-        u = 'http://%s:%d/%s' % (self.addr, port, loc)
+        u = 'http://%s:%d/%s' % (self.node.address(), port, loc)
         return u 
 
     def __check_request(self, r, extraComment=None, ignoreH2oError=False):
@@ -1206,7 +1141,7 @@ class H2O(object):
         if self.java_heap_GB is not None:
             if (1 > self.java_heap_GB > 63):
                 raise Exception('java_heap_GB <1 or >63  (GB): %s' % (self.java_heap_GB))
-            args += [ '-Xms%dG' % self.java_heap_GB ]
+            #args += [ '-Xms%dG' % self.java_heap_GB ]
             args += [ '-Xmx%dG' % self.java_heap_GB ]
 
         if self.java_extra_args is not None:
@@ -1227,15 +1162,20 @@ class H2O(object):
                 '--ip=%s' % self.addr,
                 ]
 
-        # Need to specify port, since there can be multiple ports for an ip in the flatfile
+        # Need to specify port, since there can be multiple ports for an ip
         if self.port is not None:
             args += [
                 "--port=%d" % self.port,
             ]
 
-        if self.use_flatfile:
+        if self.host_port_list is not None:
+            t = copy.copy(self.host_port_list)
+            random.shuffle(t)
+            hosts_value = ''
+            for hp in t:
+                hosts_value += hp[0].address() + ":" + str(hp[1]) + ','
             args += [
-                '--flatfile=' + self.flatfile,
+                '--hosts=' + hosts_value,
             ]
 
         args += [
@@ -1277,7 +1217,7 @@ class H2O(object):
         return args
 
     def __str__(self):
-        return '%s - http://%s:%d/' % (type(self), self.addr, self.port)
+        return '%s - http://%s:%d/' % (type(self), self.node.address(), self.port)
 
     def get_ice_dir(self):
         raise Exception('%s must implement %s' % (type(self), inspect.stack()[0][3]))
@@ -1317,7 +1257,6 @@ class InProcessH2O(H2O):
         self.rc = None
         # FIX! no option for local /home/username ..always the sandbox (LOG_DIR)
         self.ice = tmp_dir('ice.')
-        self.flatfile = flatfile_name()
         if self.node_id is not None:
             logPrefix = 'in-process-h2o-' + str(self.node_id)
         else:
@@ -1325,11 +1264,6 @@ class InProcessH2O(H2O):
         check_port_group(self.port)
         self.node = NodeCL(self.get_node_args());
         self.node.start();
-        self.addr = NodeVM.localIP();
-
-    def get_flatfile(self):
-        return self.flatfile
-        # return find_file(flatfile_name())
 
     def get_ice_dir(self):
         return self.ice
@@ -1341,18 +1275,17 @@ class LocalH2O(H2O):
         self.rc = None
         # FIX! no option for local /home/username ..always the sandbox (LOG_DIR)
         self.ice = tmp_dir('ice.')
-        self.flatfile = flatfile_name()
+        self.node = NodeVM(self.get_java_args(), self.get_node_args());
+
         if self.node_id is not None:
             logPrefix = 'local-h2o-' + str(self.node_id)
         else:
             logPrefix = 'local-h2o'
-        check_port_group(self.port)
-        self.node = NodeVM(self.get_java_args(), self.get_node_args());
-        self.node.start();
-        self.addr = NodeVM.localIP();
+        outfd,outpath = tmp_file(logPrefix + '.stdout.', '.log')
+        errfd,errpath = tmp_file(logPrefix + '.stderr.', '.log')
+        self.node.persistIO(outpath, errpath);
 
-    def get_flatfile(self):
-        return self.flatfile
+        self.node.start();
 
     def get_ice_dir(self):
         return self.ice
@@ -1361,38 +1294,28 @@ class LocalH2O(H2O):
         self.ps.send_signal(signal.SIGQUIT)
 
 class RemoteHost(Host):
-    def __init__(self, addr, username, **kwargs):
-        super(RemoteHost, self).__init__(addr)
-        self.username = username
+    def __init__(self, addr, user, key, **kwargs):
+        super(RemoteHost, self).__init__(addr, user, key)
 
     def remote_h2o(self, *args, **kwargs):
-        return RemoteH2O(self, self.addr(), *args, **kwargs)
+        return RemoteH2O(self, *args, **kwargs)
 
     def __str__(self):
-        return 'ssh://%s@%s' % (self.username, self.addr())
+        return 'ssh://%s@%s' % (self.user(), self.node.address())
 
 class RemoteH2O(H2O):
     '''An H2O instance launched on a specified host'''
     def __init__(self, host, *args, **kwargs):
         super(RemoteH2O, self).__init__(*args, **kwargs)
 
-        # need to copy the flatfile. We don't always use it (depends on h2o args)
-        self.flatfile = host.upload_file(flatfile_name())
-        # distribute AWS credentials
-        if self.aws_credentials:
-            self.aws_credentials = host.upload_file(self.aws_credentials)
-
         if self.use_home_for_ice:
             # this will be the username used to ssh to the host
-            self.ice = "/home/" + host.username + '/ice.%d.%s' % (self.port, time.time())
+            self.ice = "/home/" + host.user() + '/ice.%d.%s' % (self.port, time.time())
         else:
             self.ice = '/tmp/ice.%d.%s' % (self.port, time.time())
 
-        self.node = NodeHost(host, *args)
+        self.node = NodeHost(host, self.get_java_args(), self.get_node_args())
         self.node.start();
-
-    def get_flatfile(self):
-        return self.flatfile
 
     def get_ice_dir(self):
         return self.ice

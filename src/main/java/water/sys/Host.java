@@ -17,7 +17,7 @@ public class Host {
   }
 
   public static final String FOLDER = "h2o_rsync";
-  private final String       _addr, _user, _key;
+  private final String       _address, _user, _key;
 
   public Host(String addr) {
     this(addr, System.getProperty("user.name"));
@@ -28,13 +28,13 @@ public class Host {
   }
 
   public Host(String addr, String user, String key) {
-    _addr = addr;
+    _address = addr;
     _user = user;
     _key = key;
   }
 
-  public String addr() {
-    return _addr;
+  public String address() {
+    return _address;
   }
 
   public String user() {
@@ -110,12 +110,12 @@ public class Host {
       }
       args.addAll(sources);
 
-      args.add(_addr + ":" + "/home/" + _user + "/" + FOLDER);
+      args.add(_address + ":" + "/home/" + _user + "/" + FOLDER);
+      //System.out.println(Arrays.toString(args.toArray()));
       ProcessBuilder builder = new ProcessBuilder(args);
       builder.environment().put("CYGWIN", "nodosfilewarning");
-      builder.redirectErrorStream(true);
       process = builder.start();
-      NodeVM.inheritIO(process, Log.padRight("rsync to " + _addr + ": ", 24));
+      NodeVM.inheritIO(process, Log.padRight("rsync to " + _address + ": ", 24));
       process.waitFor();
     } catch( Exception ex ) {
       throw new RuntimeException(ex);

@@ -12,58 +12,40 @@ import water.sys.VM.Watchdog;
  * Creates a node on a host.
  */
 public class NodeHost implements Node {
-  private final Host     _host;
-  private final String[] _args;
-  private final Thread   _thread;
+  private volatile SSH _ssh;
 
-  public NodeHost(Host host, String[] args) {
-    _host = host;
-    _args = args;
-
-    _thread = new Thread() {
-      @Override
-      public void run() {
-        try {
-          SSH ssh = new SSH(_host, _args);
-          ssh.start();
-          ssh.waitFor();
-        } catch( Exception ex ) {
-          Log.write(ex);
-        }
-      }
-    };
-
-    _thread.setDaemon(true);
+  public NodeHost(Host host, String[] javaArgs, String[] nodeArgs) {
+    _ssh = new SSH(host, new String[] { command(javaArgs, nodeArgs) });
   }
 
   public Host host() {
-    return _host;
+    return _ssh.host();
   }
 
   @Override
-  public void inheritIO() {
-
+  public String address() {
+    return host().address();
   }
 
   @Override
   public void persistIO(String outFile, String errFile) throws IOException {
-
+    _ssh.persistIO(outFile, errFile);
   }
 
   @Override
   public void start() {
-    _thread.start();
+    _ssh.startThread();
   }
 
   @Override
   public boolean isAlive() {
-    return _thread.isAlive();
+    return _ssh._thread == null || _ssh._thread.isAlive();
   }
 
   @Override
   public int waitFor() {
     try {
-      _thread.join();
+      _ssh._thread.join();
     } catch( InterruptedException e ) {
     }
     return 0;
@@ -74,33 +56,57 @@ public class NodeHost implements Node {
     // TODO;
   }
 
-  public static String command(String[] args) throws Exception {
+  public static String command(String[] javaArgs, String[] nodeArgs) {
     ArrayList<String> list = new ArrayList<String>();
     // TODO When port forwarding done
     // list.add("-agentlib:jdwp=transport=dt_socket,address=127.0.0.1:8000,server=y,suspend=n");
     VM.defaultParams(list);
+    if( javaArgs != null )
+      list.addAll(Arrays.asList(javaArgs));
 
     String cp = "";
-    int shared = new File(".").getCanonicalPath().length() + 1;
-    for( String s : System.getProperty("java.class.path").split(File.pathSeparator) ) {
-      cp += cp.length() != 0 ? ":" : "";
-      cp += new File(s).getCanonicalPath().substring(shared).replace('\\', '/');
+    try {
+      int shared = new File(".").getCanonicalPath().length() + 1;
+      for( String s : System.getProperty("java.class.path").split(File.pathSeparator) ) {
+        cp += cp.length() != 0 ? ":" : "";
+        cp += new File(s).getCanonicalPath().substring(shared).replace('\\', '/');
+      }
+      list.add("-cp");
+      list.add(cp);
+    } catch( IOException e ) {
+      throw new RuntimeException(e);
     }
-    list.add("-cp");
-    list.add(cp);
 
     String command = "cd " + Host.FOLDER + ";java";
     for( String s : list )
       command += " " + s;
     command += " " + NodeVM.class.getName();
-    for( String s : args )
+    for( String s : nodeArgs )
       command += " " + s;
     return command;
   }
 
   static class SSH extends Watchdog {
+    Thread _thread;
+
     public SSH(Host host, String[] args) {
       super(host, args);
+    }
+
+    final void startThread() {
+      _thread = new Thread() {
+        @Override
+        public void run() {
+          try {
+            SSH.this.start();
+            SSH.this.waitFor();
+          } catch( Exception ex ) {
+            Log.write(ex);
+          }
+        }
+      };
+      _thread.setDaemon(true);
+      _thread.start();
     }
 
     public static void main(String[] args) throws Exception {
@@ -109,11 +115,12 @@ public class NodeHost implements Node {
       Host host = getHost(args);
       ArrayList<String> list = new ArrayList<String>();
       list.addAll(Arrays.asList(host.ssh().split(" ")));
-      list.add(host.addr());
+      list.add(host.address());
       // TODO Port forwarding for security
       // list.add("-L");
       // list.add("8000:127.0.0.1:" + local);
-      list.add(command(getArgs(args)));
+      list.addAll(Arrays.asList(getArgs(args)));
+      System.out.println(host.address() + ": " + Arrays.toString(list.toArray()));
       exec(list);
     }
   }

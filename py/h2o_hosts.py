@@ -1,7 +1,7 @@
 import getpass, json, h2o
 import random, os
 # UPDATE: all multi-machine testing will pass list of IP and base port addresses to H2O
-# means we won't realy on h2o self-discovery of cluster
+# means we won't really on h2o self-discovery of cluster
 
 def find_config(base):
     f = base
@@ -64,13 +64,10 @@ def build_cloud_with_hosts(node_count=None,
     aws_credentials = hostDict.setdefault('aws_credentials', None)
 
     # can override the json with a caller's argument
-    # FIX! and we support passing othe kwargs from above? but they don't override
+    # FIX! and we support passing the kwargs from above? but they don't override
     # json, ...so have to fix here if that's desired
     if node_count is not None:
         h2oPerHost = node_count
-
-    if use_flatfile is not None:
-        useFlatfile = use_flatfile
 
     if use_hdfs is not None:
         useHdfs = use_hdfs
@@ -110,19 +107,9 @@ def build_cloud_with_hosts(node_count=None,
         hosts = []
         for h in hostList:
             h2o.verboseprint("Connecting to:", h)
-            hosts.append(h2o.RemoteHost(addr=h, username=username, key_filename=key_filename))
-   
-    # handles hosts=None correctly
-    h2o.write_flatfile(node_count=h2oPerHost, base_port=basePort, hosts=hosts)
+            hosts.append(h2o.RemoteHost(addr=h, user=username, key=key_filename))
 
-    if hosts is not None:
-        # this uploads the flatfile too
-        h2o.upload_jar_to_remote_hosts(hosts, slow_connection=slow_connection)
-        # timeout wants to be larger for large numbers of hosts * h2oPerHost
-        # use 60 sec min, 5 sec per node.
-        timeoutSecs = max(60, 8*(len(hosts) * h2oPerHost))
-    else: # for 127.0.0.1 case
-        timeoutSecs = 60
+    timeoutSecs = 60
 
     # sandbox gets cleaned in build_cloud
     h2o.build_cloud(h2oPerHost,

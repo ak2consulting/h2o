@@ -19,7 +19,7 @@ public class TestRunner {
       // sites.add(new NodeVM(args));
 
       Host host = new Host("192.168.1.15" + (i + 1));
-      nodes.add(new NodeHost(host, args));
+      nodes.add(new NodeHost(host, null, args));
     }
 
     Host.rsync(nodes);

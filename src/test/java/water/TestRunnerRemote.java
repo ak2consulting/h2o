@@ -32,7 +32,7 @@ public class TestRunnerRemote {
       Host host = getHost(args);
       String key = host.key() != null ? host.key() : "";
       String s = "ssh-agent sh -c \"ssh-add " + key + "; ssh -l " + host.user() + " -A" + Host.SSH_OPTS;
-      s += " " + host.addr() + " '" + NodeHost.command(getArgs(args)) + "'\"";
+      s += " " + host.address() + " '" + NodeHost.command(null, getArgs(args)) + "'\"";
       System.out.println(s);
       ArrayList<String> list = new ArrayList<String>();
       File onWindows = new File("C:/cygwin/bin/bash.exe");

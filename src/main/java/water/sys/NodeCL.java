@@ -6,8 +6,7 @@ import java.lang.reflect.Method;
 import java.net.*;
 import java.util.*;
 
-import water.Boot;
-import water.TestUtil;
+import water.*;
 
 /**
  * Creates a node in-process using a separate class loader.
@@ -27,9 +26,8 @@ public class NodeCL extends Thread implements Node {
   }
 
   @Override
-  public void inheritIO() {
-    // TODO add -id to PID?
-    // invoke(className, methodName, args)
+  public String address() {
+    return Log.HOST; // TODO cache elsewhere
   }
 
   @Override

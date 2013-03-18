@@ -14,7 +14,6 @@ import water.Log;
 public abstract class VM {
   private final ArrayList<String> _args;
   private Process                 _process;
-  private boolean                 _inherit;
   private File                    _out, _err;
 
   public VM(String[] args) {
@@ -46,10 +45,6 @@ public abstract class VM {
     return _process;
   }
 
-  public void inheritIO() {
-    _inherit = true;
-  }
-
   public void persistIO(String out, String err) throws IOException {
     _out = new File(out);
     _err = new File(err);
@@ -59,8 +54,7 @@ public abstract class VM {
     ProcessBuilder builder = new ProcessBuilder(_args);
     try {
       _process = builder.start();
-      if( _inherit )
-        inheritIO(_process, null);
+      inheritIO(_process, null);
       if( _out != null )
         persistIO(_process, _out, _err);
     } catch( IOException e ) {
@@ -156,13 +150,20 @@ public abstract class VM {
    * Otherwise every killed test leaves a bunch of orphan ssh and java processes.
    */
   public static class Watchdog extends VM {
+    private final Host _host;
+
     public Watchdog(Host host, String[] args) {
       super(addHost(host, args));
+      _host = host;
+    }
+
+    public Host host() {
+      return _host;
     }
 
     public static String[] addHost(Host host, String[] args) {
       String k = host.key() != null ? host.key() : "null";
-      String[] res = new String[] { host.addr(), host.user(), k };
+      String[] res = new String[] { host.address(), host.user(), k };
       if( args != null )
         res = (String[]) ArrayUtils.addAll(res, args);
       return res;
