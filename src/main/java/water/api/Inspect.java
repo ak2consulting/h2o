@@ -89,6 +89,10 @@ public class Inspect extends Request {
         JsonObject res = new JsonObject();
         return RFView.redirect(res,val._key);
       }
+      if( f instanceof Job.Fail ) {
+        UKV.remove(val._key);   // Not sure if this is a good place to do this
+        return Response.error(((Job.Fail)f)._message);
+      }
     }
     return serveUnparsedValue(val);
   }
@@ -205,7 +209,7 @@ public class Inspect extends Request {
       json.addProperty(MEAN, c._mean);
       json.addProperty(VARIANCE, c._sigma);
       json.addProperty(NUM_MISSING_VALUES, va._numrows - c._n);
-      json.addProperty(TYPE, c._domain != null ? "enum" : (c.isFloat() ? "int" : "float"));
+      json.addProperty(TYPE, c._domain != null ? "enum" : (c.isFloat() ? "float" : "int"));
       json.addProperty(ENUM_DOMAIN_SIZE, c._domain != null ? c._domain.length : 0);
       cols.add(json);
     }

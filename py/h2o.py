@@ -547,14 +547,12 @@ def stabilize_cloud(node, node_count, timeoutSecs=14.0, retryDelaySecs=0.25):
 class H2O(object):
     def __init__(self,
         use_this_ip_addr=None, port=54321, host_port_list=None, capture_output=True, use_debugger=None,
-        use_hdfs=False, hdfs_root="/datasets",
+        use_hdfs=False,
         # hdfs_version="cdh4", hdfs_name_node="192.168.1.151",
         hdfs_version="cdh3u5", hdfs_name_node="192.168.1.176",
         hdfs_config=None,
-        # FIX not interesting any more?
-        hdfs_nopreload=None,
         aws_credentials=None,
-        java_heap_GB=None, java_extra_args=None, 
+        java_heap_MB=None, java_heap_GB=None, java_extra_args=None, 
         use_home_for_ice=False, node_id=None, username=None,
         random_udp_drop=False,
         inherit_io=False
@@ -579,11 +577,10 @@ class H2O(object):
         self.use_hdfs = use_hdfs
         self.hdfs_name_node = hdfs_name_node
         self.hdfs_version = hdfs_version
-        self.hdfs_root = hdfs_root
         self.hdfs_config = hdfs_config
-        self.hdfs_nopreload = hdfs_nopreload
 
         self.java_heap_GB = java_heap_GB
+        self.java_heap_MB = java_heap_MB
         self.java_extra_args = java_extra_args
 
         self.use_home_for_ice = use_home_for_ice
@@ -1146,6 +1143,13 @@ class H2O(object):
             #args += [ '-Xms%dG' % self.java_heap_GB ]
             args += [ '-Xmx%dG' % self.java_heap_GB ]
 
+        if self.java_heap_MB is not None:
+            if (1 > self.java_heap_MB > 63000):
+                raise Exception('java_heap_MB <1 or >63000  (MB): %s' % (self.java_heap_MB))
+            args += [ '-Xms%dm' % self.java_heap_MB ]
+            args += [ '-Xmx%dm' % self.java_heap_MB ]
+            print "crikey",self.java_heap_MB
+
         if self.java_extra_args is not None:
             args += [ '%s' % self.java_extra_args ]
 
@@ -1197,12 +1201,7 @@ class H2O(object):
             args += [
                 '-hdfs hdfs://' + self.hdfs_name_node,
                 '-hdfs_version=' + self.hdfs_version, 
-                '-hdfs_root=' + self.hdfs_root,
             ]
-            if self.hdfs_nopreload:
-                args += [
-                    '-hdfs_nopreload ' + self.hdfs_nopreload
-                ]
             if self.hdfs_config:
                 args += [
                     '-hdfs_config ' + self.hdfs_config
