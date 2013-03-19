@@ -14,6 +14,7 @@ import water.Log;
 public abstract class VM {
   private final ArrayList<String> _args;
   private Process                 _process;
+  private boolean                 _inherit;
   private File                    _out, _err;
 
   public VM(String[] args) {
@@ -45,6 +46,10 @@ public abstract class VM {
     return _process;
   }
 
+  public void inheritIO() {
+    _inherit = true;
+  }
+
   public void persistIO(String out, String err) throws IOException {
     _out = new File(out);
     _err = new File(err);
@@ -54,7 +59,8 @@ public abstract class VM {
     ProcessBuilder builder = new ProcessBuilder(_args);
     try {
       _process = builder.start();
-      inheritIO(_process, null);
+      if( _inherit )
+        inheritIO(_process, null);
       if( _out != null )
         persistIO(_process, _out, _err);
     } catch( IOException e ) {

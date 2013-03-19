@@ -31,6 +31,12 @@ public class NodeCL extends Thread implements Node {
   }
 
   @Override
+  public void inheritIO() {
+    // TODO add -id to PID?
+    // invoke(className, methodName, args)
+  }
+
+  @Override
   public void persistIO(String outFile, String errFile) throws IOException {
     // TODO
     // invoke(className, methodName, args)

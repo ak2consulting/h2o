@@ -532,8 +532,8 @@ public final class H2O {
     // Do not forget to put SELF into the static configuration (to simulate
     // proper multicast behavior)
     if( STATIC_H2OS != null && !STATIC_H2OS.contains(SELF)) {
-      System.err.println("[h2o] *WARNING* flatfile configuration does not include self: " + SELF);
-      System.err.println("[h2o] *WARNING* flatfile contains: " + STATIC_H2OS);
+      System.err.println("[h2o] *WARNING* -hosts argument does not include self: " + SELF);
+      System.err.println("[h2o] *WARNING* -hosts argument contains: " + STATIC_H2OS);
       STATIC_H2OS.add(SELF);
     }
 
@@ -605,8 +605,8 @@ public final class H2O {
 
 
   // Parse arguments and set cloud name in any case. Strip out "-name NAME"
-  // and "-flatfile <filename>". Ignore the rest. Set multi-cast port as a hash
-  // function of the name. Parse node ip addresses from the filename.
+  // and "-hosts". Ignore the rest. Set multi-cast port as a hash function of
+  // the name. Parse node ip addresses from the filename.
   static void initializeNetworkSockets( ) {
     // Assign initial ports
     InetAddress inet = findInetAddressForSelf();
@@ -697,23 +697,23 @@ public final class H2O {
 
     } else {                    // Multicast Simulation
       // The multicast simulation is little bit tricky. To achieve union of all
-      // specified nodes' flatfiles (via option -flatfile), the simulated
+      // specified nodes' hosts (via option -hosts), the simulated
       // multicast has to send packets not only to nodes listed in the node's
-      // flatfile (H2O.STATIC_H2OS), but also to all cloud members (they do not
-      // need to be specified in THIS node's flatfile but can be part of cloud
-      // due to another node's flatfile).
+      // hosts (H2O.STATIC_H2OS), but also to all cloud members (they do not
+      // need to be specified in THIS node's hosts but can be part of cloud
+      // due to another node's hosts).
       //
       // Furthermore, the packet have to be send also to Paxos proposed members
       // to achieve correct functionality of Paxos.  Typical situation is when
       // this node receives a Paxos heartbeat packet from a node which is not
-      // listed in the node's flatfile -- it means that this node is listed in
-      // another node's flatfile (and wants to create a cloud).  Hence, to
+      // listed in the node's hosts -- it means that this node is listed in
+      // another node's hosts (and wants to create a cloud).  Hence, to
       // allow cloud creation, this node has to reply.
       //
       // Typical example is:
-      //    node A: flatfile (B)
-      //    node B: flatfile (C), i.e., A -> (B), B-> (C), C -> (A)
-      //    node C: flatfile (A)
+      //    node A: hosts (B)
+      //    node B: hosts (C), i.e., A -> (B), B-> (C), C -> (A)
+      //    node C: hosts (A)
       //    Cloud configuration: (A, B, C)
       //
 

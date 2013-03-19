@@ -44,7 +44,9 @@ def build_cloud_with_hosts(node_count=None,
     # at least for the hosts case
     offset = random.randint(0,31)
     basePort = hostDict.setdefault('base_port', 55300 + offset)
+
     username = hostDict.setdefault('username','0xdiag')
+    key_filename = hostDict.setdefault('key_filename', None)
 
     useHdfs = hostDict.setdefault('use_hdfs', False)
     hdfsNameNode = hostDict.setdefault('hdfs_name_node', '192.168.1.151')
@@ -58,10 +60,10 @@ def build_cloud_with_hosts(node_count=None,
 
     use_home_for_ice = hostDict.setdefault('use_home_for_ice', False)
 
-    # key file
-    key_filename = hostDict.setdefault('key_filename', None)
     # host aws configuration
     aws_credentials = hostDict.setdefault('aws_credentials', None)
+
+    inherit_io = hostDict.setdefault('inherit_io', False)
 
     # can override the json with a caller's argument
     # FIX! and we support passing the kwargs from above? but they don't override
@@ -93,7 +95,7 @@ def build_cloud_with_hosts(node_count=None,
     h2o.verboseprint("host config: ", username,
         h2oPerHost, basePort,
         useHdfs, hdfsNameNode, hdfsVersion, hdfsConfig, javaHeapGB, use_home_for_ice,
-        hostList, key_filename, aws_credentials, **kwargs)
+        hostList, key_filename, aws_credentials, inherit_io, **kwargs)
 
     #********************
     global hosts
@@ -107,7 +109,10 @@ def build_cloud_with_hosts(node_count=None,
         hosts = []
         for h in hostList:
             h2o.verboseprint("Connecting to:", h)
-            hosts.append(h2o.RemoteHost(addr=h, user=username, key=key_filename))
+            key = None
+            if(key_filename is not None):
+                key = h2o.find_file(key_filename)
+            hosts.append(h2o.RemoteHost(addr=h, user=username, key=key))
 
     timeoutSecs = 60
 
@@ -119,4 +124,5 @@ def build_cloud_with_hosts(node_count=None,
             java_heap_GB=javaHeapGB, java_extra_args=javaExtraArgs,
             use_home_for_ice=use_home_for_ice,
             aws_credentials=aws_credentials,
+            inherit_io=inherit_io,
             **kwargs)

@@ -28,6 +28,11 @@ public class NodeHost implements Node {
   }
 
   @Override
+  public void inheritIO() {
+    _ssh.inheritIO();
+  }
+
+  @Override
   public void persistIO(String outFile, String errFile) throws IOException {
     _ssh.persistIO(outFile, errFile);
   }

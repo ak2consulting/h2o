@@ -556,7 +556,8 @@ class H2O(object):
         aws_credentials=None,
         java_heap_GB=None, java_extra_args=None, 
         use_home_for_ice=False, node_id=None, username=None,
-        random_udp_drop=False
+        random_udp_drop=False,
+        inherit_io=False
         ):
 
         if use_debugger is None: use_debugger = debugger
@@ -593,6 +594,7 @@ class H2O(object):
         # have nodes[0] remember (0 always exists)
         self.sandbox_error_was_reported = False
         self.random_udp_drop = random_udp_drop
+        self.inherit_io = inherit_io
 
     def __url(self, loc, port=None):
         # always use the new api port
@@ -1315,6 +1317,10 @@ class RemoteH2O(H2O):
             self.ice = '/tmp/ice.%d.%s' % (self.port, time.time())
 
         self.node = NodeHost(host, self.get_java_args(), self.get_node_args())
+
+        if self.inherit_io:
+            self.node.inheritIO();
+
         self.node.start();
 
     def get_ice_dir(self):
