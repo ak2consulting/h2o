@@ -3,10 +3,9 @@ SEP=":"
 case "`uname`" in
   CYGWIN*) SEP=";";;
 esac
-H2O=$(dirname $(dirname $0))
 
 # Use relative path for cygwin...
-absolute=`readlink -f $H2O`
+absolute=`readlink -f $(dirname $0)/..`
 current=`readlink -f .`
 # http://stackoverflow.com/questions/2564634/bash-convert-absolute-path-into-relative-path-given-a-current-directory
 H2O=./$(perl -MFile::Spec -e 'print File::Spec->abs2rel("'"$absolute"'","'"$current"'")')
