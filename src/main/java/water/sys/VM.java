@@ -1,6 +1,7 @@
 package water.sys;
 
 import java.io.*;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -25,8 +26,18 @@ public abstract class VM {
     _args = new ArrayList<String>();
     _args.add(System.getProperty("java.home") + "/bin/java");
     defaultParams(_args);
+
+    // Iterate on URIs in case jar has been unpacked by Boot
     _args.add("-cp");
-    _args.add(System.getProperty("java.class.path"));
+    String cp = "";
+    for( URL url : ((URLClassLoader) ClassLoader.getSystemClassLoader()).getURLs() ) {
+      try {
+        cp += new File(new URI(url.toString())) + File.pathSeparator;
+      } catch( URISyntaxException e ) {
+        throw new RuntimeException(e);
+      }
+    }
+    _args.add(cp);
 
     if( javaArgs != null )
       _args.addAll(Arrays.asList(javaArgs));

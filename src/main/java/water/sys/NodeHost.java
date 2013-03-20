@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import water.Boot;
 import water.Log;
 import water.sys.VM.Watchdog;
 
@@ -74,7 +75,10 @@ public class NodeHost implements Node {
       int shared = new File(".").getCanonicalPath().length() + 1;
       for( String s : System.getProperty("java.class.path").split(File.pathSeparator) ) {
         cp += cp.length() != 0 ? ":" : "";
-        cp += new File(s).getCanonicalPath().substring(shared).replace('\\', '/');
+        if( Boot._init.fromJar() )
+          cp += new File(s).getName();
+        else
+          cp += new File(s).getCanonicalPath().substring(shared).replace('\\', '/');
       }
       list.add("-cp");
       list.add(cp);

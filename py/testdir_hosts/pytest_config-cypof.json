@@ -4,7 +4,7 @@
     "username": "0xdiag",
     "key_filename": "0xdiag_rsa",
     "use_home_for_ice": true,
-    "inherit_io": true,
+    "inherit_io": false,
 
     "h2o_per_host": 1,
     "java_heap_GB": 28,
