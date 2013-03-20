@@ -13,10 +13,15 @@ public class Jython {
     list.add("-Dpython.options.includeJavaStackInExceptions=true");
     list.add("-Dpython.options.showJavaExceptions=true");
     list.add("-Dpython.options.showPythonProxyExceptions=true");
+    list.add("-Dpython.path=py;py/Lib");
     list.add("-S");
 
     // list.add("py/test.py");
-    list.add("py/cypof.py");
+    // list.add("py/cypof.py");
+    // list.add("py/junit.py");
+    list.add("py/testdir_hosts/test_w_hosts.py");
+    list.add("-cj");
+    list.add("py/testdir_hosts/pytest_config-cypof.json");
     // list.add("-v");
 
     // Reflection: Jython is not a dependency during build

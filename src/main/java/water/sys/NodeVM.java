@@ -1,7 +1,6 @@
 package water.sys;
 
 import water.Boot;
-import water.Log;
 
 /**
  * Creates a node in a VM.
@@ -22,6 +21,6 @@ public class NodeVM extends VM implements Node {
 
   @Override
   public String address() {
-    return Log.HOST; // TODO cache elsewhere
+    return VM.localIP();
   }
 }

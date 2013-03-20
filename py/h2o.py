@@ -192,44 +192,9 @@ def make_syn_dir():
 def dump_json(j):
     return json.dumps(j, sort_keys=True, indent=2)
 
-# Hackery: find the ip address that gets you to Google's DNS
-# Trickiness because you might have multiple IP addresses (Virtualbox), or Windows.
-# we used to not like giving ip 127.0.0.1 to h2o?
-def get_ip_address():
-    if ipaddr:
-        verboseprint("get_ip case 1:", ipaddr)
-        return ipaddr
-
-    import socket
-    ip = '127.0.0.1'
-    # this method doesn't work if vpn is enabled..it gets the vpn ip
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8',0))
-        ip = s.getsockname()[0]
-        verboseprint("get_ip case 2:", ip)
-    except:
-        pass
-
-    if ip.startswith('127'):
-        ip = socket.getaddrinfo(socket.gethostname(), None)[0][4][0]
-        verboseprint("get_ip case 3:", ip)
-
-    ipa = None
-    for ips in socket.gethostbyname_ex(socket.gethostname())[2]:
-         # only take the first 
-         if ipa is None and not ips.startswith("127."):
-            ipa = ips[:]
-            verboseprint("get_ip case 4:", ipa)
-            if ip != ipa:
-                print "\nAssuming", ip, "is the ip address h2o will use but", ipa, "is probably the real ip?"
-                print "You might have a vpn active. Best to use '-ip "+ipa+"' to get python and h2o the same."
-
-    verboseprint("get_ip_address:", ip) 
-    return ip
-
 def spawn_clone(javaArgs, nodeArgs):
     n = NodeVM(javaArgs, nodeArgs);
+    # n.inheritIO();
     n.start();
     return n
 

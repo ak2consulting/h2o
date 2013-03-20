@@ -151,6 +151,10 @@ public abstract class VM {
     thread.start();
   }
 
+  public static String localIP() {
+    return Log.HOST; // TODO cache elsewhere
+  }
+
   /**
    * A VM whose only job is to wait for its parent to be gone, then kill its child process.
    * Otherwise every killed test leaves a bunch of orphan ssh and java processes.

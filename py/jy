@@ -3,5 +3,13 @@ SEP=":"
 case "`uname`" in
   CYGWIN*) SEP=";";;
 esac
+H2O=$(dirname $(dirname $0))
+
+# Use relative path for cygwin...
+absolute=`readlink -f $H2O`
+current=`readlink -f .`
+# http://stackoverflow.com/questions/2564634/bash-convert-absolute-path-into-relative-path-given-a-current-directory
+H2O=./$(perl -MFile::Spec -e 'print File::Spec->abs2rel("'"$absolute"'","'"$current"'")')
+
 #-agentlib:jdwp=transport=dt_socket,server=y,address=8000,suspend=y
-java -ea -cp ../target/h2o.jar$SEP../py/jython.jar org.python.util.jython $@
+java -ea -cp $H2O/target/h2o.jar$SEP$H2O/py/jython.jar org.python.util.jython $@
