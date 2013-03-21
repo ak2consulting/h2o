@@ -189,7 +189,6 @@ def dump_hosts_config(ec2_config, reservation, filename=DEFAULT_HOSTS_FILENAME):
     cfg['aws_credentials'] = find_file(ec2_config['aws_credentials'])
     cfg['username']        = ec2_config['username'] 
     cfg['key_filename']    = find_file(ec2_config['pem'])
-    cfg['use_flatfile']    = True
     cfg['h2o_per_host']    = 1
     cfg['java_heap_GB']    = MEMORY_MAPPING[ec2_config['instance_type']]['xmx']
     cfg['java_extra_args'] = '-XX:MaxDirectMemorySize=1g'
