@@ -27,7 +27,7 @@ public class NodeCL extends Thread implements Node {
 
   @Override
   public String address() {
-    return Log.HOST; // TODO cache elsewhere
+    return VM.localIP(); // TODO cache elsewhere
   }
 
   @Override

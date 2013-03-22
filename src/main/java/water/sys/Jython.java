@@ -15,14 +15,7 @@ public class Jython {
     list.add("-Dpython.options.showPythonProxyExceptions=true");
     list.add("-Dpython.path=py;py/Lib");
     list.add("-S");
-
-    // list.add("py/test.py");
-    // list.add("py/cypof.py");
-    // list.add("py/junit.py");
-    list.add("py/testdir_hosts/test_w_hosts.py");
-    list.add("-cj");
-    list.add("py/testdir_hosts/pytest_config-cypof.json");
-    // list.add("-v");
+    list.addAll(Arrays.asList(args));
 
     // Reflection: Jython is not a dependency during build
     Class c = Class.forName("org.python.util.jython");
@@ -89,7 +82,8 @@ public class Jython {
       }
     }
 
-    private static HttpURLConnection getConnection(String url, float timeoutSecs, Map<String, Object> params) throws Exception {
+    private static HttpURLConnection getConnection(String url, float timeoutSecs, Map<String, Object> params)
+        throws Exception {
       String s = url;
       if( params != null ) {
         for( Entry<String, Object> entry : params.entrySet() ) {

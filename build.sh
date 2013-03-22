@@ -34,7 +34,7 @@ DEPENDENCIES="${JAR_ROOT}/jama/*${SEP}${JAR_ROOT}/apache/*${SEP}${JAR_ROOT}/juni
 DEFAULT_HADOOP_VERSION="1.0.0"
 OUTDIR="target"
 
-JAVAC=`which javac`
+JAVAC=`which javac`||echo Missing javac
 
 # need bootclasspath to point to jdk1.6 rt.jar bootstrap classes
 # extdirs can also be passed as -extdirs 
