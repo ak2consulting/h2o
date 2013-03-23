@@ -21,14 +21,12 @@ import java.util.*;
 import java.util.Map.Entry;
 
 import water.*;
-import water.ValueArray.Column;
 import water.util.RString;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class GLM extends Request {
-
   protected final H2OHexKey _key = new H2OHexKey(KEY);
   protected final H2OHexKeyCol _y = new H2OHexKeyCol(Y, _key);
   protected final HexColumnSelect _x = new HexNonConstantColumnSelect(X, _key, _y);
@@ -208,9 +206,9 @@ public class GLM extends Request {
       LSMSolver lsm = null;
       switch(_lsmSolver.value()){
       case AUTO:
-        lsm = data.expandedSz() < 1000?
-            new ADMMSolver(_lambda.value(),_alpha.value()):
-            new GeneralizedGradientSolver(_lambda.value(),_alpha.value());
+        lsm = //data.expandedSz() < 1000?
+            new ADMMSolver(_lambda.value(),_alpha.value());//:
+            //new GeneralizedGradientSolver(_lambda.value(),_alpha.value());
          break;
       case ADMM:
         lsm = new ADMMSolver(_lambda.value(),_alpha.value());
@@ -249,7 +247,7 @@ public class GLM extends Request {
     GLMBuilder( GLMModel m) { _m=m; }
     public String build(Response response, JsonObject json, String contextName) {
       StringBuilder sb = new StringBuilder();;
-      modelHTML(_m,json.get("GLMModel").getAsJsonObject(),sb);
+      modelHTML(_m,json.get(GLMModel.NAME).getAsJsonObject(),sb);
       return sb.toString();
     }
 
@@ -290,7 +288,7 @@ public class GLM extends Request {
       long xtime = 0;
       for( GLMValidation v : m._vals ) {
         if(v._modelKeys != null)for( Key k : v._modelKeys) {
-          GLMModel m2 = UKV.get(k, new GLMModel());
+          GLMModel m2 = UKV.get(k);
           xtime += m2._time;
           ++count;
         }
@@ -363,6 +361,8 @@ public class GLM extends Request {
       switch( m._glmParams._link ) {
       case identity: eq = new RString("y = %equation");   break;
       case logit:    eq = new RString("y = 1/(1 + Math.exp(-(%equation)))");  break;
+      case log:      eq = new RString("y = Math.exp((%equation)))");  break;
+      case inverse:  eq = new RString("y = 1/(%equation)");  break;
       default:       eq = new RString("equation display not implemented"); break;
       }
       StringBuilder sb = new StringBuilder();

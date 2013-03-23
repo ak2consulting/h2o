@@ -63,6 +63,8 @@ def build_cloud_with_hosts(node_count=None,
 
     # host aws configuration
     aws_credentials = hostDict.setdefault('aws_credentials', None)
+    # a little hack to redirect import folder tests to an s3 folder
+    redirect_import_folder_to_s3_path = hostDict.setdefault('redirect_import_folder_to_s3_path', None)
 
     inherit_io = hostDict.setdefault('inherit_io', False)
 
@@ -129,4 +131,5 @@ def build_cloud_with_hosts(node_count=None,
             use_home_for_ice=use_home_for_ice,
             aws_credentials=aws_credentials,
             inherit_io=inherit_io,
+            redirect_import_folder_to_s3_path=redirect_import_folder_to_s3_path,
             **kwargs)

@@ -4,7 +4,6 @@ import hex.DGLM.CaseMode;
 import hex.DGLM.Family;
 import hex.DGLM.GLMModel;
 import hex.DGLM.Link;
-import hex.KMeans.KMeansModel;
 import hex.rf.Confusion;
 import hex.rf.RFModel;
 
@@ -1440,20 +1439,15 @@ public class RequestArguments extends RequestStatics {
   // ---------------------------------------------------------------------------
   // H2OKey
   // ---------------------------------------------------------------------------
-
   public class H2OKey extends InputText<Key> {
-
     public final Key _defaultValue;
-
     public H2OKey(String name) {
       super(name, true);
       _defaultValue = null;
     }
-
     public H2OKey(String name, String keyName) {
       this(name, Key.make(keyName));
     }
-
     public H2OKey(String name, Key key) {
       super(name, false);
       _defaultValue = key;
@@ -1471,31 +1465,24 @@ public class RequestArguments extends RequestStatics {
     @Override protected String queryDescription() {
       return "Valid H2O key";
     }
-
   }
 
   // ---------------------------------------------------------------------------
   // H2OExistingKey
   // ---------------------------------------------------------------------------
-
   public class H2OExistingKey extends TypeaheadInputText<Value> {
-
     public final Key _defaultValue;
-
     public H2OExistingKey(String name) {
       super(TypeaheadKeysRequest.class, name, true);
       _defaultValue = null;
     }
-
     public H2OExistingKey(String name, String keyName) {
       this(name, Key.make(keyName));
     }
-
     public H2OExistingKey(String name, Key key) {
       super(TypeaheadKeysRequest.class, name, false);
       _defaultValue = key;
     }
-
     @Override protected Value parse(String input) throws IllegalArgumentException {
       Key k = Key.make(input);
       Value v = DKV.get(k);
@@ -1518,7 +1505,6 @@ public class RequestArguments extends RequestStatics {
   // ---------------------------------------------------------------------------
   // H2OHexKey
   // ---------------------------------------------------------------------------
-
   public class H2OHexKey extends TypeaheadInputText<ValueArray> {
     public final Key _defaultKey;
 
@@ -1543,19 +1529,12 @@ public class RequestArguments extends RequestStatics {
         throw new IllegalArgumentException("Key "+input+" not found!");
       if (!v.isArray())
         throw new IllegalArgumentException("Key "+input+" is not a valid HEX key");
-      ValueArray va = ValueArray.value(v);
-      if ((va._cols == null) || (va._cols.length == 0))
-        throw new IllegalArgumentException("Key "+input+" is not a valid HEX key");
-      return va;
+      return v.get();
     }
 
     @Override protected ValueArray defaultValue() {
-      try {
-        if(_defaultKey == null) return null;
-        return ValueArray.value(DKV.get(_defaultKey));
-      } catch (Exception e) {
-        return null;
-      }
+      if(_defaultKey == null) return null;
+      return DKV.get(_defaultKey).get();
     }
 
     @Override protected String queryDescription() {
@@ -1564,35 +1543,29 @@ public class RequestArguments extends RequestStatics {
   }
 
   // -------------------------------------------------------------------------
-  public class H2OModelKey<T extends Model> extends TypeaheadInputText<T> {
-    private final String _filter_string;
-    public H2OModelKey(TypeaheadKeysRequest tkr, String name, boolean req) {
-      super(tkr.getClass(), name, req);
-      _filter_string = tkr._filter.defaultValue();
-    }
-
-    @Override protected T parse(String input) throws IllegalArgumentException {
-      if( input.indexOf(_filter_string) == -1 )
-        throw new IllegalArgumentException("Key "+input+" is not a Model key");
+  public class H2OModelKey<TM extends Model, TK extends TypeaheadKeysRequest> extends TypeaheadInputText<TM> {
+    public H2OModelKey(TK tkr, String name, boolean req) { super(tkr.getClass(), name, req); }
+    @Override protected TM parse(String input) throws IllegalArgumentException {
       Key k = Key.make(input);
       Value v = DKV.get(k);
       if (v == null)
         throw new IllegalArgumentException("Key "+input+" not found!");
-      try {
-        return v.get();
-      } catch(Throwable t) {
-        throw new IllegalArgumentException("Key "+input+" is not a Model key");
-      }
+      return v.get();
     }
-
     @Override protected String queryDescription() { return "An existing H2O Model key"; }
-    @Override protected T defaultValue() { return null; }
+    @Override protected TM defaultValue() { return null; }
   }
 
   // -------------------------------------------------------------------------
-  public class H2OGLMModelKey extends H2OModelKey<GLMModel> {
+  public class H2OGLMModelKey extends H2OModelKey<GLMModel, TypeaheadGLMModelKeyRequest> {
     public H2OGLMModelKey(String name, boolean req) {
-      super(new TypeaheadGLMModelKeyRequest(), name, req);
+      super(new TypeaheadGLMModelKeyRequest(),name, req);
+    }
+  }
+  // -------------------------------------------------------------------------
+  public class RFModelKey extends H2OModelKey<RFModel, TypeaheadRFModelKeyRequest> {
+    public RFModelKey(String name) {
+      super(new TypeaheadRFModelKeyRequest(),name, true);
     }
   }
 
@@ -1871,14 +1844,14 @@ public class RequestArguments extends RequestStatics {
       };
     }
     double _maxNAsRatio = 0.1;
-    ThreadLocal<ArrayList<String>> _constantColumns = new ThreadLocal<ArrayList<String>>();
+    ThreadLocal<TreeSet<String>> _constantColumns = new ThreadLocal<TreeSet<String>>();
     ThreadLocal<Integer> _badColumns = new ThreadLocal<Integer>();
 
     @Override
     public boolean shouldIgnore(int i, ValueArray.Column ca ) {
       if(ca._min == ca._max){
         if(_constantColumns.get() == null)
-          _constantColumns.set(new ArrayList<String>());
+          _constantColumns.set(new TreeSet<String>());
         _constantColumns.get().add(Objects.firstNonNull(ca._name, String.valueOf(i)));
         return true;
       }
@@ -1905,8 +1878,7 @@ public class RequestArguments extends RequestStatics {
     @Override
     public String queryComment(){
       if(_constantColumns.get() == null || _constantColumns.get().isEmpty())return "";
-      ArrayList<String> ignoredCols = _constantColumns.get();
-      Collections.sort(ignoredCols);
+      TreeSet<String> ignoredCols = _constantColumns.get();
       if(_badColumns.get() != null && _badColumns.get() > 0)
         return "<div class='alert'><b> There were " + _badColumns.get() + " bad columns not selected by default. Ignoring " + _constantColumns.get().size() + " constant columns</b>: " + ignoredCols.toString() +"</div>";
       else
@@ -2154,32 +2126,6 @@ public class RequestArguments extends RequestStatics {
       return result;
     }
 
-  }
-
-  public class RFModelKey extends TypeaheadInputText<RFModel> {
-
-    public RFModelKey(String name) {
-      super(TypeaheadRFModelKeyRequest.class, name, true);
-    }
-
-    @Override protected RFModel parse(String input) throws IllegalArgumentException {
-      Value v = UKV.getValue(Key.make(input));
-      if( v == null )
-        throw new IllegalArgumentException("Key "+input+" was not found");
-      try {
-        return v.get(new RFModel());
-      } catch (Exception e) {
-        throw new IllegalArgumentException("Key "+input+" is not a model key");
-      }
-    }
-
-    @Override protected RFModel defaultValue() {
-      return null;
-    }
-
-    @Override protected String queryDescription() {
-      return "Key of the RF model";
-    }
   }
 
   public class NTree extends Int {

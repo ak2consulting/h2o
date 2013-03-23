@@ -44,15 +44,21 @@ public abstract class DGLM {
       _link = link;
     }
 
-    public void checkResponseCol(Column ycol){
+    public void checkResponseCol(Column ycol, ArrayList<String> warnings){
       switch(_family){
       case poisson:
         if(ycol._min < 0)
           throw new GLMException("Invalid response variable " + ycol._name + ", Poisson family requires response to be >= 0. ");
+        if(ycol._domain != null && ycol._domain.length > 0)
+          throw new GLMException("Invalid response variable " + ycol._name + ", Poisson family requires response to be integer number >= 0. Got categorical.");
+        if(ycol.isFloat())
+          warnings.add("Running family=Poisson on non-integer response column. Poisson is dicrete distribution, consider using gamma or gaussian instead.");
         break;
       case gamma:
         if(ycol._min <= 0)
           throw new GLMException("Invalid response variable " + ycol._name + ", Gamma family requires response to be > 0. ");
+        if(ycol._domain != null && ycol._domain.length > 0)
+          throw new GLMException("Invalid response variable " + ycol._name + ", Poisson family requires response to be integer number >= 0. Got categorical.");
         break;
       case binomial:
         if(_caseMode == CaseMode.none && (ycol._min < 0 || ycol._max > 1))
@@ -194,8 +200,6 @@ public abstract class DGLM {
       }
     }
   }
-
-
   // helper function
   static final double y_log_y(double y, double mu){
     mu = Math.max(Double.MIN_NORMAL, mu);
@@ -226,20 +230,6 @@ public abstract class DGLM {
         throw new Error("unimplemented");
       }
     }
-    public double aic(double dev, long nobs, int betaLen){
-      switch(this){
-      case gaussian:
-        return nobs *(Math.log(dev/nobs * 2 *Math.PI)+1)+2 + 2*betaLen;
-      case binomial:
-        return 2*betaLen + dev;
-      case poisson:
-        return 2*betaLen + dev;
-      case gamma:
-        return Double.NaN;
-      default:
-        throw new Error("unknown family Id " + this);
-      }
-    }
     public double variance(double mu){
       switch(this){
       case gaussian:
@@ -254,26 +244,22 @@ public abstract class DGLM {
       default:
         throw new Error("unknown family Id " + this);
       }
-
     }
-
-    /**
-     * Per family deviance computation.
-     *
-     * @param family
-     * @param yr
-     * @param ym
-     * @return
-     */
-    public double deviance(double yr, double ym){
-      switch(this){
+  /**
+  * Per family deviance computation.
+  *
+  * @param family
+  * @param yr
+  * @param ym
+  * @return
+  */
+  public double deviance(double yr, double ym){
+    switch(this){
       case gaussian:
         return (yr - ym)*(yr - ym);
       case binomial:
         return 2*((y_log_y(yr, ym)) + y_log_y(1-yr, 1-ym));
-        //return -2*(yr * ym - Math.log(1 + Math.exp(ym)));
       case poisson:
-        //ym = Math.exp(ym);
         if(yr == 0)return 2*ym;
         return 2*((yr * Math.log(yr/ym)) - (yr - ym));
       case gamma:
@@ -353,8 +339,6 @@ public abstract class DGLM {
     public final LSMSolver _solver;   // Which solver is used
     public final GLMParams _glmParams;
 
-    public transient int _responseCol; // Response column
-
     final double [] _beta;            // The output coefficients!  Main model result.
     final double [] _normBeta;        // normalized coefficients
 
@@ -362,8 +346,16 @@ public abstract class DGLM {
     public GLMValidation [] _vals;
     // Empty constructor for deseriaization
 
+    public int rank(){
+      if(_beta == null)return -1;
+      int res = 0;
+      for(double b:_beta)
+        if(b != 0)++res;
+      return res;
+    }
 
     public boolean isSolved() { return _beta != null; }
+    public static final String NAME = GLMModel.class.getSimpleName();
     public static final String KEY_PREFIX = "__GLMModel_";
     // Hand out the coffients.  Must be treated as a read-only array.
     public double[] beta() { return _beta; }
@@ -381,14 +373,17 @@ public abstract class DGLM {
      */
     public int [] selectedColumns(){
       if(DKV.get(_dataKey) == null) return null;
-      ValueArray ary = ValueArray.value(_dataKey);
+      ValueArray ary = DKV.get(_dataKey).get();
       HashSet<String> colNames = new HashSet<String>();
-      for(Column c:_va._cols)
-        colNames.add(c._name);
-      int [] res = new int[colNames.size()];
+      for(int i = 0; i < _va._cols.length-1; ++i)
+        colNames.add(_va._cols[i]._name);
+      String responseCol = _va._cols[_va._cols.length-1]._name;
+      int [] res = new int[colNames.size()+1];
       int j = 0;
       for(int i = 0; i < ary._cols.length; ++i)
         if(colNames.contains(ary._cols[i]._name))res[j++] = i;
+        else if(ary._cols[i]._name.equals(responseCol))
+          res[res.length-1] = i;
       return res;
     }
 
@@ -450,13 +445,9 @@ public abstract class DGLM {
 
     public boolean converged() { return _converged; }
 
-
-
-
-
     // Validate on a dataset.  Columns must match, including the response column.
     public GLMValidation validateOn( ValueArray ary, Sampling s, double [] thresholds ) {
-      int[] modelDataMap = columnMapping(ary.colNames());
+      int[] modelDataMap = ary.getColumnIds(_va.colNames());//columnMapping(ary.colNames());
       if( !isCompatible(modelDataMap) ) // This dataset is compatible or not?
         throw new GLMException("incompatible dataset");
       DataFrame data = new DataFrame(ary, modelDataMap, s, false, true);
@@ -486,7 +477,7 @@ public abstract class DGLM {
         if(models[i].isSolved())
           models[i].validateOn(ary, new Sampling(i, folds, true),thresholds);
       }
-      GLMValidation res = new GLMValidation(models, ErrMetric.SUMC,thresholds);
+      GLMValidation res = new GLMValidation(_selfKey,models, ErrMetric.SUMC,thresholds);
       if(_vals == null)_vals = new GLMValidation[]{res};
       else {
         _vals = Arrays.copyOf(_vals, _vals.length+1);
@@ -594,7 +585,6 @@ public abstract class DGLM {
   public static class GLMValidation extends Iced {
     public final Key [] _modelKeys; // Multiple models for n-fold cross-validation
     public static final String KEY_PREFIX = "__GLMValidation_";
-
     Key _key;
     Key _dataKey;
     Key _modelKey;
@@ -607,31 +597,15 @@ public abstract class DGLM {
     public double _nullDeviance;
     public double _err;
     ErrMetric _errMetric = ErrMetric.SUMC;
-    double _auc;
+    double _auc = Double.NaN;
     public ConfusionMatrix [] _cm;
     int _tid;
     double [] _thresholds;
 
     public GLMValidation(){_modelKeys = null;}
-    public GLMValidation(GLMParams glmp, long n, long dof, double dev, double nullDev, double err){
-      this(glmp, n,dof,dev,nullDev,err,null,null);
-    }
-
-    public GLMValidation(GLMParams glmp, long n, long dof, double dev, double nullDev, double err, double [] thresholds, ConfusionMatrix [] cms) {
-      _modelKeys = null;
-      _n = n;
-      _dof = dof;
-      _deviance = dev;
-      _nullDeviance = nullDev;
-      _aic = glmp._family.aic(_deviance, _n, (int)(_n - dof));
-      _err = err;
-      _thresholds = thresholds;
-      _cm = cms;
-    }
-
-    public GLMValidation(GLMModel [] models, ErrMetric m, double [] thresholds) {
+    public GLMValidation(Key modelKey, GLMModel [] models, ErrMetric m, double [] thresholds) {
       _errMetric = m;
-      _modelKey = models[0]._selfKey;
+      _modelKey = modelKey;
       _dataKey = models[0]._dataKey;
       _modelKeys = new Key[models.length];
       int i = 0;
@@ -653,18 +627,25 @@ public abstract class DGLM {
       long n = 0;
       double nDev = 0;
       double dev = 0;
+      double aic = 0;
       double err = 0;
+      int rank = -1;
       if(models[0]._vals[0]._cm != null){
         int nthresholds = models[0]._vals[0]._cm.length;
         _cm = new ConfusionMatrix[nthresholds];
         for(int t = 0; t < nthresholds; ++t)
-          _cm[t] = models[0]._vals[0]._cm[t];
+          _cm[t] = models[0]._vals[0]._cm[t].clone();
         n += models[0]._vals[0]._n;
         dev = models[0]._vals[0]._deviance;
+        rank = models[0].rank();
+        aic = models[0]._vals[0]._aic - 2*rank;
         nDev = models[0]._vals[0]._nullDeviance;
         for(i = 1; i < models.length; ++i){
+          int xm_rank = models[i].rank();
+          rank = Math.max(xm_rank,rank);
           n += models[i]._vals[0]._n;
           dev += models[0]._vals[0]._deviance;
+          aic += models[0]._vals[0]._aic - 2*xm_rank;
           nDev += models[0]._vals[0]._nullDeviance;
           for(int t = 0; t < nthresholds; ++t)
             _cm[t].add(models[i]._vals[0]._cm[t]);
@@ -673,18 +654,21 @@ public abstract class DGLM {
         computeBestThreshold(m);
         computeAUC();
       } else {
-        for(GLMModel xm:models){
+        for(GLMModel xm:models) {
+          int xm_rank = xm.rank();
+          rank = Math.max(xm_rank,rank);
           n += xm._vals[0]._n;
           dev += xm._vals[0]._deviance;
           nDev += xm._vals[0]._nullDeviance;
           err += xm._vals[0]._err;
+          aic += (xm._vals[0]._aic - 2*xm_rank);
         }
       }
-      _err = err;
+      _err = err/models.length;
       _deviance = dev;
       _nullDeviance = nDev;
       _n = n;
-      _aic = models[0]._glmParams._family.aic(_deviance, _n, models[0]._beta.length);
+      _aic = aic + 2*rank;
       _dof = _n - models[0]._beta.length - 1;
     }
 
@@ -703,7 +687,7 @@ public abstract class DGLM {
             @Override
             public GLMModel next() {
               if(idx == keys.length) throw new NoSuchElementException();
-              return DKV.get(keys[idx++]).get(new GLMModel());
+              return DKV.get(keys[idx++]).get();
             }
               @Override
             public boolean hasNext() {
@@ -787,7 +771,6 @@ public abstract class DGLM {
       double auc = 0;           // Area-under-ROC
       double TPR_pre = 1;
       double FPR_pre = 1;
-
       for(int t = 0; t < _cm.length; ++t){
         double TPR = 1 - _cm[t].classErr(1); // =TP/(TP+FN) = true -positive-rate
         double FPR =     _cm[t].classErr(0); // =FP/(FP+TN) = false-positive-rate
@@ -812,7 +795,8 @@ public abstract class DGLM {
       res.addProperty("dof", _dof);
       res.addProperty("resDev", _deviance);
       res.addProperty("nullDev", _nullDeviance);
-      res.addProperty("auc", _auc);
+      if(!Double.isNaN(_auc))res.addProperty("auc", _auc);
+      if(!Double.isNaN(_aic))res.addProperty("aic", _aic);
 
       if(_cm != null) {
         double [] err = _cm[_tid].classErr();
@@ -970,12 +954,30 @@ public abstract class DGLM {
       NewRowVecTask<GLMValidation> tsk = new NewRowVecTask<GLMValidation>(this, data);
       tsk.invoke(data._ary._key);
       GLMValidation res = tsk._result;
+      if(_glmp._family != Family.binomial)
+        res._err = Math.sqrt(res._err/res._n);
       res._dataKey = data._ary._key;
       res._thresholds = _thresholds;
       res._s = data.getSampling();
       res.computeBestThreshold(ErrMetric.SUMC);
       res.computeAUC();
-      res._aic = _glmp._family.aic(res._deviance, res._n, _beta.length);
+      switch(_glmp._family) {
+      case gaussian:
+        res._aic =  res._n*(Math.log(res._deviance/res._n * 2 *Math.PI)+1)+2;
+        break;
+      case binomial:
+        res._aic = res._deviance;
+        break;
+      case poisson:
+        res._aic *= -2;
+        break; // aic is set during the validation task
+      case gamma:
+        res._aic = Double.NaN;
+        break; // aic for gamma is not computed
+      default:
+        assert false:"missing implementation for family " + _glmp._family;
+      }
+      res._aic += 2*_beta.length;//_glmp._family.aic(res._deviance, res._n, _beta.length);
       return res;
     }
 
@@ -1003,10 +1005,15 @@ public abstract class DGLM {
       for(int i = 0; i < x.length; ++i)
         ym += _beta[indexes[i]] * x[i];
       ym = _glmp._link.linkInv(ym);
-
       res._deviance += _glmp._family.deviance(yr, ym);
       res._nullDeviance += _glmp._family.deviance(yr, _ymu);
-      if(_glmp._family == Family.binomial) {
+      if(_glmp._family == Family.poisson) { // aic for poisson
+        res._err += (ym - yr)*(ym - yr);
+        long y = Math.round(yr);
+        double logfactorial = 0;
+        for(long i = 2; i <= y; ++i)logfactorial += Math.log(i);
+        res._aic += (yr*Math.log(ym) - logfactorial - ym);
+      } else if(_glmp._family == Family.binomial) { // cm computation for binomial
         if(yr < 0 || yr > 1 )
           throw new Error("response variable value out of range: " + yr);
         int i = 0;
@@ -1023,6 +1030,7 @@ public abstract class DGLM {
       x._n += y._n;
       x._nullDeviance += y._nullDeviance;
       x._deviance += y._deviance;
+      x._aic += y._aic;
       x._err += y._err;
       x._caseCount += y._caseCount;
       if(x._cm != null) {
@@ -1077,11 +1085,12 @@ public abstract class DGLM {
     long t1 = System.currentTimeMillis();
     // make sure we have valid response variable for the current family
     Column ycol = data._ary._cols[data._modelDataMap[data._modelDataMap.length-1]];
-    params.checkResponseCol(ycol);
+    ArrayList<String> warns = new ArrayList<String>();
+    params.checkResponseCol(ycol,warns);
     // filter out constant columns...
     GramMatrixFunc gramF = new GramMatrixFunc(data, params, oldBeta);
     double [] newBeta = MemoryManager.malloc8d(data.expandedSz());
-    ArrayList<String> warns = new ArrayList<String>();
+
     boolean converged = true;
     Gram gram = gramF.apply(data);
     int iter = 1;

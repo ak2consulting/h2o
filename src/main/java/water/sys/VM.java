@@ -196,7 +196,7 @@ public abstract class VM {
     }
 
     protected static String[] getArgs(String[] args) {
-      return (String[]) ArrayUtils.subarray(args, 3, args.length);
+      return Arrays.copyOfRange(args, 3, args.length);
     }
 
     protected static void exec(ArrayList<String> list) throws Exception {

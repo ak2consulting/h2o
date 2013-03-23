@@ -3,6 +3,7 @@ import h2o_cmd
 import random
 import time
 
+# params is mutable here
 def pickRandRfParams(paramDict, params):
     colX = 0
     randomGroupSize = random.randint(1,len(paramDict))
@@ -15,8 +16,8 @@ def pickRandRfParams(paramDict, params):
         if (randomKey=='x'):
             colX = randomValue
         # temp hack to avoid CM=0 results if 100% sample and using OOBEE
-        if ('out_of_bag_error_estimate' in params) and ('sample' in params) and (params['sample']==100):
-            params['sample'] = 90
+        # UPDATE: if the default is oobe=1, it might not be in params...just have to not have the
+        # test ask for 100
     return colX
 
 def simpleCheckRFView(node, rfv, noprint=False, **kwargs):
@@ -138,7 +139,9 @@ def scoreRF(scoreParseKey, trainResult, **kwargs):
     ntree       = trainResult['ntree']
     
     start = time.time()
-    scoreResult = h2o_cmd.runRFView(modelKey=rfModelKey, parseKey=scoreParseKey, ntree=ntree, **kwargs)
+    data_key = scoreParseKey['destination_key']
+    scoreResult = h2o_cmd.runRFView(None, data_key, rfModelKey, ntree, **kwargs)
+
     rftime      = time.time()-start 
     h2o.verboseprint("RF score results: ", scoreResult)
     h2o.verboseprint("RF computation took {0} sec".format(rftime))

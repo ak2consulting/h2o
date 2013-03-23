@@ -82,7 +82,8 @@ def parse_our_args():
     # Set sys.argv to the unittest args (leav sys.argv[0] as is)
     # FIX! this isn't working to grab the args we don't care about
     # Pass "--failfast" to stop on first error to unittest. and -v
-    sys.argv[1:] = ['-v', "--failfast"] + args.unittest_args
+    #    sys.argv[1:] = ['-v', "--failfast"] + args.unittest_args
+    sys.argv[1:] = args.unittest_args
 
 def verboseprint(*args, **kwargs):
     if verbose:
@@ -372,7 +373,8 @@ def check_sandbox_for_errors():
                 foundNOPTaskCnt = 0
                 if not ' bytes)' in line:
                     # no multiline FSM on this 
-                    printSingleWarning = regex3.search(line) and not ('[Loaded ' in line)
+                    printSingleWarning = (regex3.search(line) and not ('[Loaded ' in line)) or \
+                        ('Non-member packets' in line)
                     #   13190  280      ###        sun.nio.ch.DatagramChannelImpl::ensureOpen (16 bytes)
 
                     # don't detect these class loader info messags as errors
@@ -423,12 +425,18 @@ def check_sandbox_for_errors():
     # we probably could have a tearDown with the test rather than the class, but we
     # would have to update all tests. 
     if len(errLines)!=0:
-        emsg1 = " check_sandbox_for_errors: Errors in sandbox stdout or stderr.\n" + \
-                 "Could have occurred at any prior time\n\n"
-        emsg2 = "".join(errLines)
-        if nodes: 
-            nodes[0].sandbox_error_report(True)
-        raise Exception(python_test_name + emsg1 + emsg2)
+        # check if the lines all start with INFO: or have "apache" in them
+        justInfo = True
+        for e in errLines:
+            justInfo &= re.match("INFO:", e) or ("apache" in e)
+
+        if not justInfo:
+            emsg1 = " check_sandbox_for_errors: Errors in sandbox stdout or stderr.\n" + \
+                     "Could have occurred at any prior time\n\n"
+            emsg2 = "".join(errLines)
+            if nodes: 
+                nodes[0].sandbox_error_report(True)
+            raise Exception(python_test_name + emsg1 + emsg2)
 
 
 def tear_down_cloud(node_list=None):
@@ -520,8 +528,11 @@ class H2O(object):
         java_heap_MB=None, java_heap_GB=None, java_extra_args=None, 
         use_home_for_ice=False, node_id=None, username=None,
         random_udp_drop=False,
-        inherit_io=False
+        inherit_io=False,
+        redirect_import_folder_to_s3_path=None,
         ):
+
+        self.redirect_import_folder_to_s3_path = redirect_import_folder_to_s3_path
 
         if use_debugger is None: use_debugger = debugger
         self.aws_credentials = aws_credentials
@@ -729,15 +740,16 @@ class H2O(object):
         return r
     
     # additional params include: cols=. don't need to include in params_dict it doesn't need a default
-    def kmeans(self, key, key2=None, timeoutSecs=10, retryDelaySecs=0.2, **kwargs):
+    def kmeans(self, key, key2=None, 
+        timeoutSecs=300, retryDelaySecs=0.2, initialDelaySecs=None, pollTimeoutSecs=30,
+        **kwargs):
+        # defaults
         params_dict = {
             'epsilon': 1e-6,
             'k': 1,
             'source_key': key,
             'destination_key': None,
             }
-        # alternate name, to match what parse has
-        # don't really need this, maybe better if tests all use 'destination_key'
         if key2 is not None: params_dict['destination_key'] = key2
         params_dict.update(kwargs)
         print "\nKMeans params list", params_dict
@@ -751,7 +763,9 @@ class H2O(object):
         if a['response']['redirect_request']!='Progress':
             print dump_json(a)
             raise Exception('H2O kmeans redirect is not Progress. KMeans json response precedes.')
-        a = self.poll_url(a['response'], timeoutSecs=timeoutSecs, retryDelaySecs=retryDelaySecs)
+        a = self.poll_url(a['response'],
+            timeoutSecs=timeoutSecs, retryDelaySecs=retryDelaySecs, 
+            initialDelaySecs=initialDelaySecs, pollTimeoutSecs=pollTimeoutSecs)
         verboseprint("\nKMeans result:", dump_json(a))
         return a
 
@@ -888,6 +902,35 @@ class H2O(object):
             params=params_dict))
         verboseprint("\nexec_query result:", dump_json(a))
         return a
+
+    def jobs_admin(self, timeoutSecs=20, **kwargs):
+        params_dict = {
+            # 'expression': None,
+            }
+        browseAlso = kwargs.pop('browseAlso',False)
+        params_dict.update(kwargs)
+        verboseprint("\nexec_query:", params_dict)
+        a = self.__check_request(requests.get(
+            url=self.__url('Jobs.json'),
+            timeout=timeoutSecs,
+            params=params_dict))
+        verboseprint("\njobs_admin result:", dump_json(a))
+        return a
+
+    def jobs_cancel(self, timeoutSecs=20, **kwargs):
+        params_dict = {
+            # 'expression': None,
+            }
+        browseAlso = kwargs.pop('browseAlso',False)
+        params_dict.update(kwargs)
+        verboseprint("\nexec_query:", params_dict)
+        a = self.__check_request(requests.get(
+            url=self.__url('Cancel.json'),
+            timeout=timeoutSecs,
+            params=params_dict))
+        verboseprint("\njobs_cancel result:", dump_json(a))
+        return a
+
 
     # note ntree in kwargs can overwrite trees! (trees is legacy param)
     def random_forest(self, data_key, trees, timeoutSecs=300, **kwargs):

@@ -5,20 +5,20 @@
     "username": "0xdiag", 
     "key_filename": "0xdiag_rsa", 
     "use_home_for_ice": true,
+    "redirect_import_folder_to_s3_path": false,
 
     "h2o_per_host": 1, 
-    "java_heap_GB": 28, 
+    "java_heap_GB": 4, 
 
     "hdfs_name_node": "192.168.1.176",
     "hdfs_version": "cdh3u5",
     "use_hdfs": true,
 
     "ip": [
-        "192.168.1.176",
-        "192.168.1.177",
-        "192.168.1.178",
-        "192.168.1.179",
-        "192.168.1.180"
+        "192.168.1.172",
+        "192.168.1.173",
+        "192.168.1.174",
+        "192.168.1.175"
     ]
 }
 

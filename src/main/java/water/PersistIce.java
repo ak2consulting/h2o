@@ -51,7 +51,7 @@ public abstract class PersistIce {
         initializeFilesFromFolder(f); // Recursively keep loading K/V pairs
       } else {
         Key k = decodeKey(f);
-        Value ice = new Value(k,(int)f.length(), Value.ICE);
+        Value ice = new Value(k,(int)f.length());
         ice.setdsk();
         H2O.putIfAbsent_raw(k,ice);
       }
@@ -142,7 +142,6 @@ public abstract class PersistIce {
       }
       i++;                      // Skip the trailing '%'
     }
-
     // a normal key - ASCII with special characters encoded after % sign
     for( ; i < key.length(); ++i ) {
       byte b = (byte)key.charAt(i);
@@ -158,10 +157,9 @@ public abstract class PersistIce {
         default:   System.err.println("Invalid format of filename " + s + " at index " + i);
         }
       }
-      kb[j++] = b;
       if( j>=kb.length ) kb = Arrays.copyOf(kb,j*2);
+      kb[j++] = b;
     }
-
     // now in kb we have the key name
     return Key.make(Arrays.copyOf(kb,j));
   }
@@ -226,7 +224,7 @@ public abstract class PersistIce {
         e.printStackTrace();
       }
       try {
-        byte[] m = v.mem(); // we are not single threaded anymore
+        byte[] m = v.memOrLoad(); // we are not single threaded anymore
         assert m != null && m.length == v._max; // Assert not saving partial files
         s.write(m);
         v.setdsk();             // Set as write-complete to disk

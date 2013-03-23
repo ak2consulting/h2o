@@ -1,7 +1,6 @@
 package water.sys;
 
 import java.io.*;
-import java.net.Socket;
 import java.util.*;
 
 import org.apache.commons.codec.binary.Base64;
@@ -52,8 +51,8 @@ public abstract class EC2 {
       request.withInstanceType(type);
       request.withImageId("ami-04cf5c6d");
       request.withMinCount(count - instances.size()).withMaxCount(count - instances.size());
-      request.withSecurityGroupIds("ssh-http");
-      request.withUserData(Base64.encodeBase64String(cloudConfig().getBytes()));
+      request.withSecurityGroupIds("ssh");
+      request.withUserData(new String(Base64.encodeBase64(cloudConfig().getBytes())));
 
       RunInstancesResult runInstances = ec2.runInstances(request);
       ArrayList<String> ids = new ArrayList<String>();
@@ -90,8 +89,12 @@ public abstract class EC2 {
       // " - yum -y install java-1.7.0-openjdk\n" +
       " - useradd " + USER + "\n" +
       " - mkdir -p /home/" + USER + "/.ssh" + "\n" +
-      " - echo '" + pubKey() + "' >> /home/" + USER + "/.ssh/authorized_keys\n" +
+      " - cd /home/" + USER + "\n" +
+      " - echo -e '\\n" + USER + " ALL=(ALL) NOPASSWD:ALL\\n' >> /etc/sudoers\n" +
+      " - wget http://h2o_rsync.s3.amazonaws.com/h2o_rsync.zip\n" +
+      " - unzip h2o_rsync.zip\n" +
       " - chown -R " + USER + ':' + USER + " /home/" + USER + "\n" +
+      " - echo '" + pubKey() + "' >> .ssh/authorized_keys\n" +
       "";
   }
 //@formatter:on
@@ -158,19 +161,14 @@ public abstract class EC2 {
 
   private static boolean canConnect(List<Instance> instances) {
     for( Instance instance : instances ) {
-      Socket socket = null;
       try {
-        socket = new Socket(instance.getPublicIpAddress(), 22);
-        socket.getInputStream().read();
-      } catch( IOException ex ) {
+        String ssh = Host.ssh() + " -q" + Host.SSH_OPTS + " " + instance.getPublicIpAddress();
+        Process p = Runtime.getRuntime().exec(ssh + " exit");
+        if( p.waitFor() != 0 )
+          return false;
+      } catch( Exception e ) {
         return false;
       } finally {
-        if( socket != null ) {
-          try {
-            socket.close();
-          } catch( Exception _ ) {
-          }
-        }
       }
     }
     return true;

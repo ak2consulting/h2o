@@ -70,13 +70,17 @@ def simpleCheckGLM(self, glm, colX, allowFailWarning=False, allowZeroCoeff=False
     validations = validationsList[0]
     print "GLMModel/validations"
     print "%15s %s" % ("err:\t", validations['err'])
-    print "%15s %s" % ("auc:\t", validations['auc'])
     print "%15s %s" % ("nullDev:\t", validations['nullDev'])
     print "%15s %s" % ("resDev:\t", validations['resDev'])
 
     # threshold only there if binomial?
+    # auc only for binomial
     if family=="binomial":
+        print "%15s %s" % ("auc:\t", validations['auc'])
         print "%15s %s" % ("threshold:\t", validations['threshold'])
+
+    if family=="poisson" or family=="gaussian" or family=="gamma":
+        print "%15s %s" % ("aic:\t", validations['aic'])
 
     # get a copy, so we don't destroy the original when we pop the intercept
     coefficients = GLMModel['coefficients'].copy()
@@ -191,7 +195,8 @@ def compareToFirstGlm(self, key, glm, firstglm):
         firstkList = [firstglm[key]]
 
     for k, firstk in zip(kList, firstkList):
-        delta = .1 * float(firstk)
+        # delta must be a positive number ?
+        delta = .1 * abs(float(firstk))
         msg = "Too large a delta (" + str(delta) + ") comparing current and first for: " + key
         self.assertAlmostEqual(float(k), float(firstk), delta=delta, msg=msg)
         self.assertGreaterEqual(abs(float(k)), 0.0, str(k) + " abs not >= 0.0 in current")
@@ -203,15 +208,15 @@ def simpleCheckGLMGrid(self, glmGridResult, colX=None, allowFailWarning=False, *
     h2o.verboseprint("Inspect of destination_key", destination_key,":\n", h2o.dump_json(inspectGG))
 
     # FIX! currently this is all unparsed!
-    type = inspectGG['type']
-    if 'unparsed' in type:
-        print "Warning: GLM Grid result destination_key is unparsed, can't interpret. Ignoring for now"
-        print "Run with -b arg to look at the browser output, for minimal checking of result"
+    #type = inspectGG['type']
+    #if 'unparsed' in type:
+    #    print "Warning: GLM Grid result destination_key is unparsed, can't interpret. Ignoring for now"
+    #    print "Run with -b arg to look at the browser output, for minimal checking of result"
 
     ### cols = inspectGG['cols']
     response = inspectGG['response'] # dict
     ### rows = inspectGG['rows']
-    value_size_bytes = inspectGG['value_size_bytes']
+    #value_size_bytes = inspectGG['value_size_bytes']
 
     model0 = glmGridResult['models'][0]
     alpha = model0['alpha']

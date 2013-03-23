@@ -55,7 +55,7 @@ public class CsvParser extends CustomParser {
 
   @SuppressWarnings("fallthrough")
   @Override public final void parse(Key key) {
-    ValueArray _ary = _aryKey == null ? null : ValueArray.value(DKV.get(_aryKey));
+    ValueArray _ary = _aryKey == null ? null : (ValueArray)DKV.get(_aryKey).get();
     ValueString _str = new ValueString();
     byte[] bits = DKV.get(key).memOrLoad();
     int offset = 0;
@@ -480,7 +480,7 @@ NEXT_CHAR:
    *  last one as it is used if all other fails because multiple spaces can be
    *  used as a single separator.
    */
-  private static byte[] separators = new byte[] { ',', ';', '|', '\t', ' ' };
+  private static byte[] separators = new byte[] { ',', ';', '|', '\t', 1/* '^A',  Hive table column separator */, ' '/*space is last in this list, because we allow multiple spaces*/ };
 
   /** Dermines the number of separators in given line. Correctly handles quoted
    * tokens.

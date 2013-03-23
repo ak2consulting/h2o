@@ -68,7 +68,9 @@ public class Host {
       threads[i] = new Thread() {
         @Override
         public void run() {
-          hosts[i_].rsync();
+          ArrayList<String> includes = new ArrayList<String>();
+          ArrayList<String> excludes = new ArrayList<String>();
+          hosts[i_].rsync(includes, excludes);
         }
       };
       threads[i].setDaemon(true);
@@ -84,43 +86,34 @@ public class Host {
     }
   }
 
-  void rsync() {
+  public void rsync(List<String> includes, List<String> excludes) {
     Process process = null;
     try {
       ArrayList<String> args = new ArrayList<String>();
       File onWindows = new File("C:/cygwin/bin/rsync.exe");
       args.add(onWindows.exists() ? onWindows.getAbsolutePath() : "rsync");
       args.add("-vrzute");
-      args.add(ssh());
+      args.add(sshWithArgs());
       args.add("--chmod=u=rwx");
-
-      ArrayList<String> sources = new ArrayList<String>();
-      ArrayList<String> excludes = new ArrayList<String>();
 
       if( Boot._init.fromJar() ) {
         String[] cp = System.getProperty("java.class.path").split(File.pathSeparator);
-        sources.addAll(Arrays.asList(cp));
+        includes.addAll(Arrays.asList(cp));
       } else {
-        sources.add("target");
-        sources.add("lib");
+        includes.add("target");
+        includes.add("lib");
 
         excludes.add("target/*.jar");
         excludes.add("lib/javassist");
         excludes.add("**/*-sources.jar");
       }
 
-      sources.add("py");
-
-      excludes.add("py/**.class");
-      excludes.add("**/cachedir");
-      excludes.add("**/sandbox");
-
-      for( int i = 0; i < sources.size(); i++ ) {
-        String path = new File(sources.get(i)).getAbsolutePath();
+      for( int i = 0; i < includes.size(); i++ ) {
+        String path = new File(includes.get(i)).getAbsolutePath();
         // Adapts paths in case running on Windows
-        sources.set(i, path.replace('\\', '/').replace("C:/", "/cygdrive/c/"));
+        includes.set(i, path.replace('\\', '/').replace("C:/", "/cygdrive/c/"));
       }
-      args.addAll(sources);
+      args.addAll(includes);
 
       // --exclude doesn't seem work on Linux (?) so use --exclude-from
       File file = File.createTempFile("exclude", null);
@@ -150,7 +143,7 @@ public class Host {
     }
   }
 
-  String ssh() {
+  static String ssh() {
     String ssh = "ssh";
     File onWindows = new File("C:/cygwin/bin/ssh.exe");
     if( onWindows.exists() ) {
@@ -161,6 +154,10 @@ public class Host {
       // chmod 600 id_rsa
       ssh = onWindows.getPath();
     }
+    return ssh;
+  }
+
+  String sshWithArgs() {
     String k = "";
     if( _key != null ) {
       // Check permission on key to help debug
@@ -177,6 +174,6 @@ public class Host {
       assert new File(_key).exists();
       k = " -i " + _key;
     }
-    return ssh + " -l " + _user + " -A" + k + SSH_OPTS;
+    return ssh() + " -l " + _user + " -A" + k + SSH_OPTS;
   }
 }

@@ -16,12 +16,9 @@ import com.google.common.io.Closeables;
 
 /** Persistence backend for S3 */
 public abstract class PersistS3 {
-  private static void log(String printf, Object... args) {
-    System.err.printf("[s3] " + printf + "\n", args);
-  }
-  private static final String   HELP = "You can specify a credentials properties file with the -aws_credentials command line switch.";
+  private static final String  HELP = "You can specify a credentials properties file with the -aws_credentials command line switch.";
 
-  private static final String  KEY_PREFIX                   = "s3:";
+  private static final String  KEY_PREFIX                   = "s3://";
   private static final int     KEY_PREFIX_LEN               = KEY_PREFIX.length();
 
   private static final AmazonS3 S3;
@@ -60,12 +57,11 @@ public abstract class PersistS3 {
       int sz = (int) Math.min(ValueArray.CHUNK_SZ, size);
       byte[] mem = MemoryManager.malloc1(sz);
       ByteStreams.readFully(is, mem);
-      ValueArray ary = new ValueArray(k, sz, Value.S3).read(new AutoBuffer(mem));
-      ary._persist = Value.S3 | Value.ON_dsk;
-      val = ary.value();
+      ValueArray ary = new ValueArray(k, sz).read(new AutoBuffer(mem));
+      val = new Value(k,ary,Value.S3);
     } else if( size >= 2 * ValueArray.CHUNK_SZ ) {
       // ValueArray byte wrapper over a large file
-      val = new ValueArray(k, size, Value.S3).value();
+      val = new Value(k,new ValueArray(k, size),Value.S3);
     } else {
       val = new Value(k, (int) size, Value.S3); // Plain Value
     }
@@ -91,9 +87,8 @@ public abstract class PersistS3 {
         skip = ValueArray.getChunkOffset(k); // The offset
         k = ValueArray.getArrayKey(k); // From the base file key
         if( k.toString().endsWith(".hex") ) { // Hex file?
-          int value_len = DKV.get(k).memOrLoad().length; // How long is the ValueArray
-                                                   // header?
-          skip += value_len;
+          int value_len = DKV.get(k).memOrLoad().length; // How long is the ValueArray header?
+          skip += value_len;    // Skip header
         }
       }
       S3Object s3obj = getObjectForKey(k, skip, v._max);
@@ -236,5 +231,9 @@ public abstract class PersistS3 {
     if (prop.containsKey(S3_MAX_HTTP_CONNECTIONS_PROP)) cfg.setMaxConnections(   Integer.getInteger(S3_MAX_HTTP_CONNECTIONS_PROP));
     //cfg.setProtocol(Protocol.HTTP);
     return cfg;
+  }
+
+  private static void log(String printf, Object... args) {
+    System.err.printf("[s3] " + printf + "\n", args);
   }
 }

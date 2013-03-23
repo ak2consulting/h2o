@@ -92,7 +92,7 @@ public class NodeHost implements Node {
     command += " " + NodeVM.class.getName();
     for( String s : nodeArgs )
       command += " " + s;
-    return command;
+    return command.replace("$", "\\$");
   }
 
   static class SSH extends Watchdog {
@@ -123,7 +123,7 @@ public class NodeHost implements Node {
 
       Host host = getHost(args);
       ArrayList<String> list = new ArrayList<String>();
-      list.addAll(Arrays.asList(host.ssh().split(" ")));
+      list.addAll(Arrays.asList(host.sshWithArgs().split(" ")));
       list.add(host.address());
       // TODO Port forwarding for security
       // list.add("-L");

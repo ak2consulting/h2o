@@ -1,5 +1,5 @@
 import unittest
-import re, os, shutil, sys, random
+import re, os, shutil, sys, random, time
 sys.path.extend(['.','..','py'])
 
 import h2o, h2o_cmd, h2o_hosts
@@ -43,7 +43,7 @@ class Basic(unittest.TestCase):
         # fail rate is one in 200?
         # need at least two rows (parser)
         for sizeTrial in range(25):
-            size = random.randint(2,129)
+            size = random.randint(1129,2255)
             print "\nparsing with rows:", size
             csvFilename = "p" + "_" + str(size)
             csvPathname = SYNDATASETS_DIR + "/" + csvFilename
@@ -62,13 +62,19 @@ class Basic(unittest.TestCase):
                     sys.stdout.write('.')
                     sys.stdout.flush()
 
+
+            # a = h2o.nodes[0].jobs_admin()
+            # print "jobs-admin():", h2o.dump_json(a)
+
             # do a storeview ..was causing npe while parsing?
             # maybe fire to each node?
             if 1==1:
                 for node in h2o.nodes:
                     storeView = node.store_view()
 
-
+        # and wait a minute to make sure all tcp_wait ports clear out
+        print "Sleeping for 120 secs so the next jenkins job doesn't see all our tcp_wait ports"
+        time.sleep(120)
 
 if __name__ == '__main__':
     h2o.unit_main()
