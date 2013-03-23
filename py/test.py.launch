@@ -12,5 +12,5 @@
 <stringAttribute key="org.eclipse.ui.externaltools.ATTR_TOOL_ARGUMENTS" value=""/>
 <stringAttribute key="org.python.pydev.debug.ATTR_INTERPRETER" value="__default"/>
 <stringAttribute key="org.python.pydev.debug.ATTR_PROJECT" value="hexbase"/>
-<stringAttribute key="org.python.pydev.debug.vm.arguments" value="-ea -cp py/jython.jar;target/classes;lib/apache/*;lib/junit/*;lib/gson/*;lib/poi/*;lib/trove/*;lib/s3/*;lib/jama/*;lib/javassist.jar;lib/hadoop/cdh4/*;lib/jets3t/*"/>
+<stringAttribute key="org.python.pydev.debug.vm.arguments" value="-ea -cp py/jython.jar:target/classes:lib/apache/*:lib/junit/*:lib/gson/*:lib/poi/*:lib/trove/*:lib/s3/*:lib/jama/*:lib/javassist.jar:lib/hadoop/cdh4/*:lib/jets3t/*"/>
 </launchConfiguration>
