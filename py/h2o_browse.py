@@ -13,7 +13,7 @@ def browseTheCloud():
     if not h2o.browse_disable:
         # after cloud building, node[0] should have the right info for us
         port = h2o.nodes[0].port
-        cloud_url = "http://" + h2o.nodes[0].http_addr + ":" + str(port) + "/Cloud.html"
+        cloud_url = "http://" + h2o.nodes[0].node.address() + ":" + str(port) + "/Cloud.html"
 
         # Open URL in new window, raising the window if possible.
         h2o.verboseprint("browseTheCloud:", cloud_url)
