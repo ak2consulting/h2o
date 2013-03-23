@@ -14,7 +14,10 @@ public class Job extends Iced {
 
   public static class Fail extends Iced {
     public final String _message;
-    public Fail(String message) { _message = message; }
+
+    public Fail(String message) {
+      _message = message;
+    }
   }
 
   private Key    _self;
@@ -44,9 +47,10 @@ public class Job extends Iced {
     new TAtomic<List>() {
       @Override
       public List atomic(List old) {
-        if( old == null ) old = new List();
+        if( old == null )
+          old = new List();
         Job[] jobs = old._jobs;
-        old._jobs = Arrays.copyOf(jobs,jobs.length+1);
+        old._jobs = Arrays.copyOf(jobs, jobs.length + 1);
         old._jobs[jobs.length] = Job.this;
         return old;
       }
@@ -74,8 +78,9 @@ public class Job extends Iced {
 
   // Overriden for Parse
   public float progress() {
-    Job.Progress dest = (Job.Progress) UKV.get(dest());
-    return dest != null ? dest.progress() : 0;
+    Freezable f = UKV.get(dest());
+    assert f == null || f instanceof Job.Progress;
+    return f instanceof Job.Progress ? ((Job.Progress) f).progress() : 0;
   }
 
   public <T> T get() {
@@ -112,15 +117,17 @@ public class Job extends Iced {
     new TAtomic<List>() {
       @Override
       public List atomic(List old) {
-        if( old == null ) return null;
+        if( old == null )
+          return null;
         Job[] jobs = old._jobs;
         int i;
         for( i = 0; i < jobs.length; i++ )
           if( jobs[i]._self.equals(_self) )
             break;
-        if( i == jobs.length ) return null;
-        jobs[i] = jobs[jobs.length-1]; // Compact out the key from the list
-        old._jobs = Arrays.copyOf(jobs,jobs.length-1);
+        if( i == jobs.length )
+          return null;
+        jobs[i] = jobs[jobs.length - 1]; // Compact out the key from the list
+        old._jobs = Arrays.copyOf(jobs, jobs.length - 1);
         return old;
       }
     }.fork(LIST);

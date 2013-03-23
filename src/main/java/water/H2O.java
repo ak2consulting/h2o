@@ -14,6 +14,8 @@ import water.nbhm.NonBlockingHashMap;
 import water.store.s3.PersistS3;
 import water.util.Utils;
 
+import com.amazonaws.auth.PropertiesCredentials;
+import com.google.common.base.Objects;
 import com.google.common.io.Closeables;
 
 /**
@@ -520,6 +522,13 @@ public final class H2O {
 
   private static void initializeExpressionEvaluation() {
     Function.initializeCommonFunctions();
+  }
+
+  // Default location of the AWS credentials file
+  private static final String DEFAULT_CREDENTIALS_LOCATION = "AwsCredentials.properties";
+  public static PropertiesCredentials getAWSCredentials() throws IOException {
+    File credentials = new File(Objects.firstNonNull(OPT_ARGS.aws_credentials, DEFAULT_CREDENTIALS_LOCATION));
+    return new PropertiesCredentials(credentials);
   }
 
   /** Starts the local k-v store.

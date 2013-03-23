@@ -1,6 +1,6 @@
 package water.sys;
 
-import java.io.File;
+import java.io.*;
 import java.util.*;
 
 import water.Boot;
@@ -60,7 +60,7 @@ public class Host {
     rsync(hosts.toArray(new Host[0]));
   }
 
-  public static void rsync(final Host... hosts) throws Exception {
+  public static void rsync(final Host... hosts) {
     Thread[] threads = new Thread[hosts.length];
 
     for( int i = 0; i < threads.length; i++ ) {
@@ -75,8 +75,13 @@ public class Host {
       threads[i].start();
     }
 
-    for( int i = 0; i < threads.length; i++ )
-      threads[i].join();
+    for( int i = 0; i < threads.length; i++ ) {
+      try {
+        threads[i].join();
+      } catch( InterruptedException e ) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   void rsync() {
@@ -87,22 +92,29 @@ public class Host {
       args.add(onWindows.exists() ? onWindows.getAbsolutePath() : "rsync");
       args.add("-vrzute");
       args.add(ssh());
-      args.add("--delete");
       args.add("--chmod=u=rwx");
 
       ArrayList<String> sources = new ArrayList<String>();
+      ArrayList<String> excludes = new ArrayList<String>();
+
       if( Boot._init.fromJar() ) {
         String[] cp = System.getProperty("java.class.path").split(File.pathSeparator);
         sources.addAll(Arrays.asList(cp));
       } else {
-        args.add("--exclude");
-        args.add("'target/*.jar'");
-        args.add("--exclude");
-        args.add("'lib/javassist'");
-
         sources.add("target");
         sources.add("lib");
+
+        excludes.add("target/*.jar");
+        excludes.add("lib/javassist");
+        excludes.add("**/*-sources.jar");
       }
+
+      sources.add("py");
+
+      excludes.add("py/**.class");
+      excludes.add("**/cachedir");
+      excludes.add("**/sandbox");
+
       for( int i = 0; i < sources.size(); i++ ) {
         String path = new File(sources.get(i)).getAbsolutePath();
         // Adapts paths in case running on Windows
@@ -110,12 +122,21 @@ public class Host {
       }
       args.addAll(sources);
 
+      // --exclude doesn't seem work on Linux (?) so use --exclude-from
+      File file = File.createTempFile("exclude", null);
+      FileWriter w = new FileWriter(file);
+      for( String s : excludes )
+        w.write(s + '\n');
+      w.close();
+      args.add("--exclude-from");
+      args.add(file.getAbsolutePath());
+
       args.add(_address + ":" + "/home/" + _user + "/" + FOLDER);
-      //System.out.println(Arrays.toString(args.toArray()));
+      // System.out.println(Arrays.toString(args.toArray()));
       ProcessBuilder builder = new ProcessBuilder(args);
       builder.environment().put("CYGWIN", "nodosfilewarning");
       process = builder.start();
-      NodeVM.inheritIO(process, Log.padRight("rsync to " + _address + ": ", 24));
+      NodeVM.inheritIO(process, Log.padRight("rsync " + VM.localIP() + " -> " + _address + ": ", 24));
       process.waitFor();
     } catch( Exception ex ) {
       throw new RuntimeException(ex);
@@ -140,7 +161,22 @@ public class Host {
       // chmod 600 id_rsa
       ssh = onWindows.getPath();
     }
-    String k = _key != null ? " -i " + _key : "";
+    String k = "";
+    if( _key != null ) {
+      // Check permission on key to help debug
+      Process p;
+      try {
+        p = Runtime.getRuntime().exec("find " + _key + " -perm 600");
+        p.waitFor();
+        BufferedReader buf = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String find = buf.readLine();
+        assert find != null && find.equals(_key) : "Invalid permission on key " + _key;
+      } catch( Exception e ) {
+        throw new RuntimeException(e);
+      }
+      assert new File(_key).exists();
+      k = " -i " + _key;
+    }
     return ssh + " -l " + _user + " -A" + k + SSH_OPTS;
   }
 }

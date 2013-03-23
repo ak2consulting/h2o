@@ -5,15 +5,40 @@ import java.io.File;
 import java.net.URI;
 
 import water.parser.ParseDataset;
+import water.sys.*;
 import water.util.Utils;
 
 public class Sandbox {
-  static final String USER = "cyprien";
-  static final String KEY  = System.getProperty("user.home") + "/.ssh/id_rsa";
+  public static void main(String[] _) throws Exception {
+    Cloud ec2 = EC2.resize(3, "m1.small");
 
-  public static void main(String[] args) throws Exception {
-    H2O.main(new String[] {});
-    TestUtil.stall_till_cloudsize(1);
+    String[] args = new String[] { "-mainClass", //
+        "water.sys.Jython", //
+        "py/cypof.py", //
+        // "py/testdir_hosts/test_w_hosts.py", //
+        // "-cj", //
+        // "py/testdir_hosts/pytest_config-cypof.json", //
+        "-v" };
+
+    RemoteRunner.exec(ec2, args);
+    Utils.readConsole();
+
+    // H2O.main(new String[] {});
+    // TestUtil.stall_till_cloudsize(1);
+
+    // ArrayList<Node> nodes = new ArrayList<Node>();
+    // int count = 1 + 2;
+    //
+    // for( int i = 0; i < count - 1; i++ ) {
+    // // sites.add(new NodeCL(args));
+    // // sites.add(new NodeVM(args));
+    //
+    // Host host = new Host("192.168.1.15" + (i + 1));
+    // nodes.add(new NodeHost(host, null, args));
+    // }
+    //
+    // for( Node node : nodes )
+    // node.start();
 
     File f = new File("smalldata/covtype/covtype.20k.data");
     // File f = new File("../../aaaa/datasets/millionx7_logreg.data.gz");

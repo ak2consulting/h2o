@@ -1269,7 +1269,7 @@ class RemoteHost(Host):
         return RemoteH2O(self, *args, **kwargs)
 
     def __str__(self):
-        return 'ssh://%s@%s' % (self.user(), self.node.address())
+        return 'ssh://%s@%s' % (self.user(), self.address())
 
 class RemoteH2O(H2O):
     '''An H2O instance launched on a specified host'''
