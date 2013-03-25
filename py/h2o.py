@@ -577,9 +577,9 @@ class H2O(object):
 
     def __check_request(self, r, extraComment=None, ignoreH2oError=False):
         if extraComment:
-            log('Sent ' + r.url + " # " + extraComment)
+            log('Sent ' + str(r) + " # " + extraComment)
         else:
-            log('Sent ' + r.url)
+            log('Sent ' + str(r))
 
         # fatal if no response
         if not r: 
@@ -616,7 +616,7 @@ class H2O(object):
                     params=args))
 
     def get(self, url, timeout=60, params=None):
-        return Request(url, http.get(url, timeout, params))
+        return Request(url, params, http.get(url, timeout, params))
 
     def get_cloud(self):
         a = self.__check_request(self.get(self.__url('Cloud.json')))
@@ -661,7 +661,7 @@ class H2O(object):
 
         url = self.__url('PostFile.json')
         resp = self.__check_request(
-            Request(url, http.post(url, timeoutSecs, {"key": key}, f)),
+            Request(url, {"key": key}, http.post(url, timeoutSecs, {"key": key}, f)),
             extraComment = str(f))
 
         verboseprint("\nput_file response: ", dump_json(resp))
@@ -1296,6 +1296,12 @@ class LocalH2O(H2O):
         errfd,errpath = tmp_file(logPrefix + '.stderr.', '.log')
         self.node.persistIO(outpath, errpath);
 
+        comment = 'stdout %s, stderr %s' % (os.path.basename(outpath), os.path.basename(errpath))        
+        log(' '.join(args), comment=comment)
+
+        if self.inherit_io:
+            self.node.inheritIO();
+
         self.node.start();
 
     def get_ice_dir(self):
@@ -1334,6 +1340,9 @@ class RemoteH2O(H2O):
         errfd,errpath = tmp_file(logPrefix + '.stderr.', '.log')
         self.node.persistIO(outpath, errpath);
 
+        comment = 'stdout %s, stderr %s' % (os.path.basename(outpath), os.path.basename(errpath))        
+        log(' '.join(args), comment=comment)
+
         if self.inherit_io:
             self.node.inheritIO();
 
@@ -1343,9 +1352,18 @@ class RemoteH2O(H2O):
         return self.ice
 
 class Request:
-    def __init__(self, url, res):
+    def __init__(self, url, params, res):
         self.url = url
+        self.params = params
         self.res = res
-    
+
     def json(self):
         return json.loads(self.res)
+
+    def __str__(self):
+        s =  self.url
+        if(self.params is not None):
+            s += '?'
+            for k in self.params:
+                s += k + '=' + str(self.params[k]) + '&'
+        return s
