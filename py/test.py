@@ -5,6 +5,8 @@ import h2o_cmd
 import h2o
 import h2o_browse as h2b
 
+from water.sys import VM
+
 class Basic(unittest.TestCase):
     def tearDown(self):
         h2o.check_sandbox_for_errors()
@@ -52,7 +54,7 @@ class Basic(unittest.TestCase):
                 'java',
                 '-Dh2o.arg.ice_root='+h2o.tmp_dir('ice.'),
                 '-Dh2o.arg.name='+h2o.cloud_name(),
-                '-Dh2o.arg.ip='+h2o.get_ip_address(),
+                '-Dh2o.arg.ip='+VM.localIP(),
                 '-ea', '-jar', h2o.find_file('target/h2o.jar'),
                 '-mainClass', 'org.junit.runner.JUnitCore',
                 # The tests
@@ -60,7 +62,7 @@ class Basic(unittest.TestCase):
                 'hex.MinorityClassTest',
                 'water.exec.RBigDataTest',
                 ])
-        rc = ps.wait(None)
+        rc = ps.wait()
         out = file(stdout).read()
         err = file(stderr).read()
         if rc is None:
