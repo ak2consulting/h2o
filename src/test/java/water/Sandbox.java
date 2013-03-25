@@ -9,7 +9,7 @@ import water.util.Utils;
 
 public class Sandbox {
   public static void main(String[] _) throws Exception {
-    Cloud ec2 = EC2.resize(1, "m1.xlarge");
+    Cloud ec2 = EC2.resize(1, "m1.xlarge", "us-east-1");
 
     Host master = new Host(ec2.publicIPs()[0]);
     ArrayList<String> includes = new ArrayList<String>(), excludes = new ArrayList<String>();

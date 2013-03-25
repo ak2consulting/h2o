@@ -20,10 +20,9 @@ public abstract class EC2 {
    *
    * @return Public IPs
    */
-  public static Cloud resize(int count, String type) throws IOException {
+  public static Cloud resize(int count, String type, String region) throws IOException {
     AmazonEC2Client ec2 = new AmazonEC2Client(H2O.getAWSCredentials());
-    ec2.setEndpoint("ec2.us-east-1.amazonaws.com");
-
+    ec2.setEndpoint("ec2." + region + ".amazonaws.com");
     DescribeInstancesResult describeInstancesResult = ec2.describeInstances();
     List<Reservation> reservations = describeInstancesResult.getReservations();
     List<Instance> instances = new ArrayList<Instance>();

@@ -1,6 +1,7 @@
 package water.sys;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileWriter;
 import java.util.*;
 
 import water.Boot;
@@ -160,19 +161,14 @@ public class Host {
   String sshWithArgs() {
     String k = "";
     if( _key != null ) {
-      // Check permission on key to help debug
-      Process p;
+      assert new File(_key).exists();
+      // Git doesn't set permissions, so force them each time
       try {
-        p = Runtime.getRuntime().exec("find " + _key + " -perm 600");
+        Process p = Runtime.getRuntime().exec("chmod 600 " + _key);
         p.waitFor();
-        BufferedReader buf = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String find = buf.readLine();
-        assert find != null && find.equals(_key) : "Invalid permission on key " + _key
-            + ", git doesn't set them so please run chmod 600 " + _key;
       } catch( Exception e ) {
         throw new RuntimeException(e);
       }
-      assert new File(_key).exists();
       k = " -i " + _key;
     }
     return ssh() + " -l " + _user + " -A" + k + SSH_OPTS;
