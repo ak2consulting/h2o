@@ -46,48 +46,33 @@ public class Host {
     return _key;
   }
 
-  public static void rsync(Iterable<Node> nodes) throws Exception {
-    HashSet<Host> hosts = new HashSet<Host>();
-    for( Node node : nodes )
-      if( node instanceof NodeHost )
-        hosts.add(((NodeHost) node).host());
-    rsync(hosts.toArray(new Host[0]));
-  }
-
-  public static void rsync(NodeHost... nodes) throws Exception {
-    HashSet<Host> hosts = new HashSet<Host>();
-    for( NodeHost node : nodes )
-      hosts.add(node.host());
-    rsync(hosts.toArray(new Host[0]));
-  }
-
-  public static void rsync(final Host... hosts) {
-    Thread[] threads = new Thread[hosts.length];
-
-    for( int i = 0; i < threads.length; i++ ) {
-      final int i_ = i;
-      threads[i] = new Thread() {
-        @Override
-        public void run() {
-          ArrayList<String> includes = new ArrayList<String>();
-          ArrayList<String> excludes = new ArrayList<String>();
-          hosts[i_].rsync(includes, excludes);
-        }
-      };
-      threads[i].setDaemon(true);
-      threads[i].start();
+  public static List<String> defaultIncludes() {
+    ArrayList<String> l = new ArrayList<String>();
+    if( Boot._init.fromJar() ) {
+      String[] cp = System.getProperty("java.class.path").split(File.pathSeparator);
+      l.addAll(Arrays.asList(cp));
+    } else {
+      l.add("target");
+      l.add("lib");
     }
-
-    for( int i = 0; i < threads.length; i++ ) {
-      try {
-        threads[i].join();
-      } catch( InterruptedException e ) {
-        throw new RuntimeException(e);
-      }
-    }
+    return l;
   }
 
-  public void rsync(List<String> includes, List<String> excludes) {
+  public static List<String> defaultExcludes() {
+    ArrayList<String> l = new ArrayList<String>();
+    if( !Boot._init.fromJar() ) {
+      l.add("target/*.jar");
+      l.add("lib/javassist");
+      l.add("**/*-sources.jar");
+    }
+    return l;
+  }
+
+  public void rsync(Collection<String> includes, Collection<String> excludes) {
+    rsync(includes.toArray(new String[0]), excludes != null ? excludes.toArray(new String[0]) : null);
+  }
+
+  public void rsync(String[] includes, String[] excludes) {
     Process process = null;
     try {
       ArrayList<String> args = new ArrayList<String>();
@@ -97,30 +82,19 @@ public class Host {
       args.add(sshWithArgs());
       args.add("--chmod=u=rwx");
 
-      if( Boot._init.fromJar() ) {
-        String[] cp = System.getProperty("java.class.path").split(File.pathSeparator);
-        includes.addAll(Arrays.asList(cp));
-      } else {
-        includes.add("target");
-        includes.add("lib");
-
-        excludes.add("target/*.jar");
-        excludes.add("lib/javassist");
-        excludes.add("**/*-sources.jar");
-      }
-
-      for( int i = 0; i < includes.size(); i++ ) {
-        String path = new File(includes.get(i)).getAbsolutePath();
+      for( int i = 0; i < includes.length; i++ ) {
+        String path = new File(includes[i]).getAbsolutePath();
         // Adapts paths in case running on Windows
-        includes.set(i, path.replace('\\', '/').replace("C:/", "/cygdrive/c/"));
+        includes[i] = path.replace('\\', '/').replace("C:/", "/cygdrive/c/");
       }
-      args.addAll(includes);
+      args.addAll(Arrays.asList(includes));
 
       // --exclude doesn't seem work on Linux (?) so use --exclude-from
       File file = File.createTempFile("exclude", null);
       FileWriter w = new FileWriter(file);
-      for( String s : excludes )
-        w.write(s + '\n');
+      if( excludes != null )
+        for( String s : excludes )
+          w.write(s + '\n');
       w.close();
       args.add("--exclude-from");
       args.add(file.getAbsolutePath());

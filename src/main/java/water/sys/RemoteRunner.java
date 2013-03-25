@@ -26,7 +26,7 @@ public class RemoteRunner {
       Host host = new Host(ips[i]);
       nodes.add(new NodeHost(host, null, args));
     }
-    Host.rsync(nodes);
+    Cloud.rsync(nodes);
 
     for( Node node : nodes ) {
       node.inheritIO();

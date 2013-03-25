@@ -8,9 +8,10 @@ import random, copy
 import errno
 
 from subprocess import Popen, PIPE
-from water.sys import Node, NodeCL, NodeVM, NodeHost, Host
+from water.sys import Node, NodeCL, NodeVM, NodeHost, Host, Cloud
 from water.sys.Jython import http
 from java.io import IOException
+from javapath import basename
 
 def cloud_name():
     return('pytest-%s-%s' % (getpass.getuser(), os.getpid()))
@@ -291,7 +292,7 @@ def build_cloud(node_count=2, base_port=54321, hosts=None,
                 node_list.append(newNode)
                 totalNodes += 1
         else:
-            Host.rsync(hosts)
+            Cloud.rsync(hosts)
 
             hostCount = len(hosts)
             host_port_list = []
@@ -1324,6 +1325,11 @@ class RemoteH2O(H2O):
     '''An H2O instance launched on a specified host'''
     def __init__(self, host, *args, **kwargs):
         super(RemoteH2O, self).__init__(*args, **kwargs)
+
+        # distribute AWS credentials
+        if self.aws_credentials:
+            host.rsync({ self.aws_credentials }, None)
+            self.aws_credentials = "/home/" + host.user() + '/' + Host.FOLDER + '/' + basename(self.aws_credentials)
 
         if self.use_home_for_ice:
             # this will be the username used to ssh to the host

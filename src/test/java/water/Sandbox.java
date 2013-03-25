@@ -2,6 +2,7 @@ package water;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 
 import water.parser.ParseDataset;
 import water.sys.*;
@@ -12,7 +13,8 @@ public class Sandbox {
     Cloud ec2 = EC2.resize(1, "m1.xlarge", "us-east-1");
 
     Host master = new Host(ec2.publicIPs()[0]);
-    ArrayList<String> includes = new ArrayList<String>(), excludes = new ArrayList<String>();
+    List<String> includes = Host.defaultIncludes();
+    List<String> excludes = Host.defaultExcludes();
     includes.add("py");
     includes.add("smalldata");
     //
@@ -61,7 +63,7 @@ public class Sandbox {
         Host host = new Host(ips[i]);
         nodes.add(new NodeHost(host, null, args));
       }
-      Host.rsync(nodes);
+      Cloud.rsync(nodes);
       for( Node node : nodes ) {
         node.inheritIO();
         node.start();
