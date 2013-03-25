@@ -45,7 +45,7 @@ def build_cloud_with_hosts(node_count=None,
     offset = random.randint(0,31)
     basePort = hostDict.setdefault('base_port', 55300 + offset)
 
-    username = hostDict.setdefault('username','0xdiag')
+    username = hostDict.setdefault('username', None)
     key_filename = hostDict.setdefault('key_filename', None)
 
     useHdfs = hostDict.setdefault('use_hdfs', False)

@@ -1326,6 +1326,13 @@ class RemoteH2O(H2O):
             self.ice = '/tmp/ice.%d.%s' % (self.port, time.time())
 
         self.node = NodeHost(host, self.get_java_args(), self.get_node_args())
+        if self.node_id is not None:
+            logPrefix = 'ssh-h2o-' + str(self.node_id)
+        else:
+            logPrefix = 'ssh-h2o'
+        outfd,outpath = tmp_file(logPrefix + '.stdout.', '.log')
+        errfd,errpath = tmp_file(logPrefix + '.stderr.', '.log')
+        self.node.persistIO(outpath, errpath);
 
         if self.inherit_io:
             self.node.inheritIO();

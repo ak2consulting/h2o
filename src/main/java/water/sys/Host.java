@@ -20,7 +20,7 @@ public class Host {
   private final String       _address, _user, _key;
 
   public Host(String addr) {
-    this(addr, System.getProperty("user.name"));
+    this(addr, null);
   }
 
   public Host(String addr, String user) {
@@ -29,7 +29,7 @@ public class Host {
 
   public Host(String addr, String user, String key) {
     _address = addr;
-    _user = user;
+    _user = user != null ? user : System.getProperty("user.name");
     _key = key;
   }
 
@@ -167,7 +167,8 @@ public class Host {
         p.waitFor();
         BufferedReader buf = new BufferedReader(new InputStreamReader(p.getInputStream()));
         String find = buf.readLine();
-        assert find != null && find.equals(_key) : "Invalid permission on key " + _key;
+        assert find != null && find.equals(_key) : "Invalid permission on key " + _key
+            + ", git doesn't set them so please run chmod 600 " + _key;
       } catch( Exception e ) {
         throw new RuntimeException(e);
       }
