@@ -23,9 +23,13 @@ public class Jython {
   }
 
   public static class browser {
-    public static void open(String url) throws Exception {
-      java.awt.Desktop desktop = java.awt.Desktop.getDesktop();
-      desktop.browse(new URI(url));
+    public static void open(String url) {
+      try {
+        java.awt.Desktop desktop = java.awt.Desktop.getDesktop();
+        desktop.browse(new URI(url));
+      } catch( Exception e ) {
+        // Ignore if browser doesn't start, probably headless
+      }
     }
   }
 
