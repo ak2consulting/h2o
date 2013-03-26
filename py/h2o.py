@@ -528,6 +528,7 @@ class H2O(object):
         hdfs_version="cdh3u5", hdfs_name_node="192.168.1.176",
         hdfs_config=None,
         aws_credentials=None,
+        use_multicast=True,
         java_heap_MB=None, java_heap_GB=None, java_extra_args=None, 
         use_home_for_ice=False, node_id=None, username=None,
         random_udp_drop=False,
