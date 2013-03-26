@@ -10,7 +10,7 @@ import water.util.Utils;
 
 public class Sandbox {
   public static void main(String[] _) throws Exception {
-    //Cloud ec2 = EC2.resize(1, "m1.xlarge", "us-east-1");
+    // Cloud ec2 = EC2.resize(1, "m1.xlarge", "us-east-1");
     Cloud ec2 = EC2.resize(10, "m1.xlarge", "us-west-1");
 
     Host master = new Host(ec2.publicIPs()[0]);
@@ -93,7 +93,7 @@ public class Sandbox {
       // File f = new File("py/testdir_single_jvm/syn_datasets/hastie_4x.data");
       Key key = TestUtil.load_test_file(f, "test");
       Key dest = Key.make("test.hex");
-      ParseDataset.parse(dest, DKV.get(key));
+      ParseDataset.parse(dest, new Key[] { key });
     }
   }
 }

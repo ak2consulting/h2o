@@ -61,6 +61,7 @@ class Basic(unittest.TestCase):
                 'water.ConcurrentKeyTest',
                 'hex.MinorityClassTest',
                 'water.exec.RBigDataTest',
+                'water.parser.ParseFolderTestBig'
                 ])
         rc = ps.wait()
         out = file(stdout).read()

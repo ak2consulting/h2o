@@ -849,11 +849,14 @@ class H2O(object):
     # FIX! what params does this take
     def store_view(self):
         a = self.__check_request(self.get(self.__url('StoreView.json'),
-            params={
-                })
-            )
-        # too much!
-        ### verboseprint("\ninspect result:", dump_json(a))
+            params={}))
+        return a
+
+    # There is also a RemoveAck in the browser, that asks for confirmation from
+    # the user. This is after that confirmation.
+    def remove_key(self, key):
+        a = self.__check_request(self.get(self.__url('Remove.json'),
+            params={"key": key}))
         return a
 
     # H2O doesn't support yet?
@@ -1213,10 +1216,10 @@ class H2O(object):
                 '-hdfs hdfs://' + self.hdfs_name_node,
                 '-hdfs_version=' + self.hdfs_version, 
             ]
-            if self.hdfs_config:
-                args += [
-                    '-hdfs_config ' + self.hdfs_config
-                ]
+        if self.hdfs_config:
+            args += [
+                '-hdfs_config ' + self.hdfs_config
+            ]
 
         if self.aws_credentials:
             args += [ '--aws_credentials='+self.aws_credentials ]
@@ -1330,6 +1333,9 @@ class RemoteH2O(H2O):
         if self.aws_credentials:
             host.rsync({ self.aws_credentials }, None)
             self.aws_credentials = "/home/" + host.user() + '/' + Host.FOLDER + '/' + basename(self.aws_credentials)
+
+        if self.hdfs_config:
+            self.hdfs_config = host.upload_file(self.hdfs_config)
 
         if self.use_home_for_ice:
             # this will be the username used to ssh to the host
