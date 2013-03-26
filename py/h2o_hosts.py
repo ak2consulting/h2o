@@ -17,6 +17,7 @@ def build_cloud_with_hosts(node_count=None,
     use_hdfs=None, hdfs_name_node=None, hdfs_config=None,  hdfs_version=None,
     base_port=None,
     java_heap_GB=None, java_heap_MB=None, java_extra_args=None,
+    use_multicast=True,
     **kwargs):
 
     # For seeing example of what we want in the json, if we add things
@@ -47,6 +48,8 @@ def build_cloud_with_hosts(node_count=None,
 
     username = hostDict.setdefault('username', None)
     key_filename = hostDict.setdefault('key_filename', None)
+    
+    use_multicast = hostDict.setdefault('use_multicast', use_multicast)
 
     useHdfs = hostDict.setdefault('use_hdfs', False)
     hdfsNameNode = hostDict.setdefault('hdfs_name_node', '192.168.1.151')
@@ -101,7 +104,7 @@ def build_cloud_with_hosts(node_count=None,
     h2o.verboseprint("host config: ", username,
         h2oPerHost, basePort,
         useHdfs, hdfsNameNode, hdfsVersion, hdfsConfig, javaHeapGB, javaHeapMB, use_home_for_ice,
-        hostList, key_filename, aws_credentials, inherit_io, **kwargs)
+        hostList, use_multicast, key_filename, aws_credentials, inherit_io, **kwargs)
 
     #********************
     global hosts
@@ -125,6 +128,7 @@ def build_cloud_with_hosts(node_count=None,
     # sandbox gets cleaned in build_cloud
     h2o.build_cloud(h2oPerHost,
             base_port=basePort, hosts=hosts, timeoutSecs=timeoutSecs,
+            use_multicast=use_multicast,
             use_hdfs=useHdfs, hdfs_name_node=hdfsNameNode,
             hdfs_version=hdfsVersion, hdfs_config=hdfsConfig,
             java_heap_GB=javaHeapGB, java_heap_MB=javaHeapMB, java_extra_args=javaExtraArgs,

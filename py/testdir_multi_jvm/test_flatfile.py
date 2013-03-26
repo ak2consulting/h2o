@@ -10,11 +10,9 @@ class Basic(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # done in build_cloud now
-        ### h2o.write_flatfile(node_count=3)
         localhost = h2o.decide_if_localhost()
         if (localhost):
-            h2o.build_cloud(node_count=3,use_flatfile=True)
+            h2o.build_cloud(node_count=3,use_multicast=False)
         else:
             h2o_hosts.build_cloud_with_hosts()
 

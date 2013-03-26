@@ -302,7 +302,9 @@ def build_cloud(node_count=2, base_port=54321, hosts=None,
             if rand_shuffle: random.shuffle(host_port_list)
             for (h,p) in host_port_list:
                 verboseprint('starting remote node', totalNodes, 'via', h)
-                newNode = h.remote_h2o(port=p, node_id=totalNodes, host_port_list=host_port_list, **kwargs)
+                node_hosts = host_port_list
+                if self.use_multicast: node_hosts = None
+                newNode = h.remote_h2o(port=p, node_id=totalNodes, host_port_list=node_hosts, **kwargs)
                 node_list.append(newNode)
                 totalNodes += 1
                 # kbn try delay between each one?
