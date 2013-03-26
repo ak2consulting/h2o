@@ -1,6 +1,6 @@
 package water.sys;
 
-import java.util.HashSet;
+import java.util.ArrayList;
 
 public class Cloud {
   private final String[] _publicIPs, _privateIPs;
@@ -18,39 +18,25 @@ public class Cloud {
     return _privateIPs;
   }
 
-  public static void rsync(Iterable<Node> nodes) throws Exception {
-    HashSet<Host> hosts = new HashSet<Host>();
-    for( Node node : nodes )
-      if( node instanceof NodeHost )
-        hosts.add(((NodeHost) node).host());
-    rsync(hosts.toArray(new Host[0]));
-  }
-
-  public static void rsync(NodeHost... nodes) throws Exception {
-    HashSet<Host> hosts = new HashSet<Host>();
-    for( NodeHost node : nodes )
-      hosts.add(node.host());
-    rsync(hosts.toArray(new Host[0]));
-  }
-
   public static void rsync(final Host... hosts) {
-    Thread[] threads = new Thread[hosts.length];
+    ArrayList<Thread> threads = new ArrayList<Thread>();
 
-    for( int i = 0; i < threads.length; i++ ) {
+    for( int i = 0; i < hosts.length; i++ ) {
       final int i_ = i;
-      threads[i] = new Thread() {
+      Thread t = new Thread() {
         @Override
         public void run() {
           hosts[i_].rsync(Host.defaultIncludes(), Host.defaultExcludes());
         }
       };
-      threads[i].setDaemon(true);
-      threads[i].start();
+      t.setDaemon(true);
+      t.start();
+      threads.add(t);
     }
 
-    for( int i = 0; i < threads.length; i++ ) {
+    for( Thread t : threads ) {
       try {
-        threads[i].join();
+        t.join();
       } catch( InterruptedException e ) {
         throw new RuntimeException(e);
       }

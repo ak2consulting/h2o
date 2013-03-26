@@ -3,9 +3,7 @@ package water.sys;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
-import java.util.Arrays;
 
-import water.H2O;
 import water.sys.VM.Watchdog;
 
 public class RemoteRunner {
@@ -14,25 +12,6 @@ public class RemoteRunner {
     r.inheritIO();
     r.start();
     return r;
-  }
-
-  static void main(String[] ipsAndargs) throws Exception {
-    VM.exitWithParent();
-    String[] args = Arrays.copyOfRange(ipsAndargs, 1, ipsAndargs.length);
-
-    ArrayList<Node> nodes = new ArrayList<Node>();
-    String[] ips = ipsAndargs[0].split(",");
-    for( int i = 1; i < ips.length; i++ ) {
-      Host host = new Host(ips[i]);
-      nodes.add(new NodeHost(host, null, args));
-    }
-    Cloud.rsync(nodes);
-
-    for( Node node : nodes ) {
-      node.inheritIO();
-      node.start();
-    }
-    H2O.main(args);
   }
 
   static class SSHWatchdog extends Watchdog {

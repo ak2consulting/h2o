@@ -46,7 +46,7 @@ public class Host {
     return _key;
   }
 
-  public static List<String> defaultIncludes() {
+  public static String[] defaultIncludes() {
     ArrayList<String> l = new ArrayList<String>();
     if( Boot._init.fromJar() ) {
       String[] cp = System.getProperty("java.class.path").split(File.pathSeparator);
@@ -55,17 +55,17 @@ public class Host {
       l.add("target");
       l.add("lib");
     }
-    return l;
+    return l.toArray(new String[0]);
   }
 
-  public static List<String> defaultExcludes() {
+  public static String[] defaultExcludes() {
     ArrayList<String> l = new ArrayList<String>();
     if( !Boot._init.fromJar() ) {
       l.add("target/*.jar");
       l.add("lib/javassist");
       l.add("**/*-sources.jar");
     }
-    return l;
+    return l.toArray(new String[0]);
   }
 
   public void rsync(Collection<String> includes, Collection<String> excludes) {
@@ -78,7 +78,7 @@ public class Host {
       ArrayList<String> args = new ArrayList<String>();
       File onWindows = new File("C:/cygwin/bin/rsync.exe");
       args.add(onWindows.exists() ? onWindows.getAbsolutePath() : "rsync");
-      args.add("-vrzute");
+      args.add("-qvrzute");
       args.add(sshWithArgs());
       args.add("--chmod=u=rwx");
 

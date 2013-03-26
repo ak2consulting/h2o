@@ -1,8 +1,7 @@
 package water;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import water.parser.ParseDataset;
 import water.sys.*;
@@ -14,8 +13,8 @@ public class Sandbox {
     Cloud ec2 = EC2.resize(10, "m1.xlarge", "us-west-1");
 
     Host master = new Host(ec2.publicIPs()[0]);
-    List<String> includes = Host.defaultIncludes();
-    List<String> excludes = Host.defaultExcludes();
+    List<String> includes = new ArrayList<String>(Arrays.asList(Host.defaultIncludes()));
+    List<String> excludes = new ArrayList<String>(Arrays.asList(Host.defaultExcludes()));
     includes.add("py");
     includes.add("smalldata");
     includes.add("AwsCredentials.properties");
@@ -58,14 +57,20 @@ public class Sandbox {
   public static class Master {
     public static void main(String[] args) throws Exception {
       VM.exitWithParent();
-
       ArrayList<Node> nodes = new ArrayList<Node>();
+      assert args[0].equals("-hosts");
       String[] ips = args[1].split(",");
       for( int i = 1; i < ips.length; i++ ) {
         Host host = new Host(ips[i]);
         nodes.add(new NodeHost(host, null, args));
       }
-      Cloud.rsync(nodes);
+
+      HashSet<Host> hosts = new HashSet<Host>();
+      for( Node node : nodes )
+        if( node instanceof NodeHost )
+          hosts.add(((NodeHost) node).host());
+      Cloud.rsync(hosts.toArray(new Host[0]));
+
       for( Node node : nodes ) {
         node.inheritIO();
         node.start();
