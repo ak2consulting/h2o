@@ -48,9 +48,14 @@ public abstract class EC2 {
     } else if( instances.size() < count ) {
       RunInstancesRequest request = new RunInstancesRequest();
       request.withInstanceType(type);
-      request.withImageId("ami-04cf5c6d");
+      if( region.startsWith("us-east") )
+        request.withImageId("ami-04cf5c6d");
+      else
+        request.withImageId("ami-a83210ed");
+
       request.withMinCount(count - instances.size()).withMaxCount(count - instances.size());
       request.withSecurityGroupIds("ssh");
+      // request.withPlacement(new Placement(region + "c")); // All in same Availability Zone
       request.withUserData(new String(Base64.encodeBase64(cloudConfig().getBytes())));
 
       RunInstancesResult runInstances = ec2.runInstances(request);

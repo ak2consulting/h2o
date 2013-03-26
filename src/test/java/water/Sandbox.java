@@ -10,13 +10,15 @@ import water.util.Utils;
 
 public class Sandbox {
   public static void main(String[] _) throws Exception {
-    Cloud ec2 = EC2.resize(1, "m1.xlarge", "us-east-1");
+    //Cloud ec2 = EC2.resize(1, "m1.xlarge", "us-east-1");
+    Cloud ec2 = EC2.resize(10, "m1.xlarge", "us-west-1");
 
     Host master = new Host(ec2.publicIPs()[0]);
     List<String> includes = Host.defaultIncludes();
     List<String> excludes = Host.defaultExcludes();
     includes.add("py");
     includes.add("smalldata");
+    includes.add("AwsCredentials.properties");
     //
     excludes.add("py/**.class");
     excludes.add("**/cachedir");
