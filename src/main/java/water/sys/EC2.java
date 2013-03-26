@@ -6,6 +6,7 @@ import java.util.*;
 import org.apache.commons.codec.binary.Base64;
 
 import water.H2O;
+import water.Sandbox.Master;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.ec2.AmazonEC2Client;
@@ -14,6 +15,42 @@ import com.amazonaws.services.ec2.model.*;
 public abstract class EC2 {
   private static final String USER = System.getProperty("user.name");
   private static final String NAME = USER + "-H2O-Cloud";
+
+  public static void main(String[] args) {
+
+    Cloud ec2 = EC2.resize(1, "m1.xlarge", "us-east-1");
+
+    Host master = new Host(ec2.publicIPs()[0]);
+    List<String> includes = new ArrayList<String>(Arrays.asList(Host.defaultIncludes()));
+    List<String> excludes = new ArrayList<String>(Arrays.asList(Host.defaultExcludes()));
+    includes.add("py");
+    includes.add("smalldata");
+    //
+    excludes.add("py/**.class");
+    excludes.add("**/cachedir");
+    excludes.add("**/sandbox");
+    master.rsync(includes, excludes);
+
+    String hosts = "";
+    for( String ip : ec2.privateIPs() )
+      hosts += ip + ",";
+
+    String[] args = new String[] { "-mainClass", //
+        // "water.sys.Jython", //
+        // "py/cypof.py", //
+
+        Master.class.getName(), //
+        "-hosts", //
+        hosts, //
+
+    // "py/testdir_hosts/test_w_hosts.py", //
+    // "-cj", //
+    // "py/testdir_hosts/pytest_config-cypof.json", //
+    // "-v"
+    };
+
+    RemoteRunner.launch(master, args);
+  }
 
   /**
    * Create or terminate EC2 instances. Uses their Name tag to find existing ones.
