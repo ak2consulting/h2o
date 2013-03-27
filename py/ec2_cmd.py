@@ -3,7 +3,6 @@
 import argparse
 import boto
 import os, time, sys, socket
-import h2o_cmd
 import json
 
 '''
@@ -74,6 +73,20 @@ EC2_API_RUN_INSTANCE = {
 'instance_initiated_shutdown_behavior':None
 }
 
+# Duplicated from h2o_cmd to run in python 
+def dot():
+    sys.stdout.write('.')
+    sys.stdout.flush()
+
+def port_live(ip, port):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect((ip,port))
+        s.shutdown(2)
+        return True
+    except:
+        return False
+
 def inheritparams(parent, kid):
     newkid = {}
     for k,v in kid.items():
@@ -131,7 +144,7 @@ def run_instances(count, ec2_config, region, waitForSSH=True):
         for instance in reservation.instances:
             while instance.update() == 'pending':
                time.sleep(1)
-               h2o_cmd.dot()
+               dot()
 
             if not instance.state == 'running':
                 raise Exception('\033[91m[ec2] Error waiting for running state. Instance is in state {0}.\033[0m'.format(instance.state))
@@ -153,7 +166,7 @@ def run_instances(count, ec2_config, region, waitForSSH=True):
 ''' Wait for ssh port 
 '''
 def ssh_live(ip, port=22):
-    return h2o_cmd.port_live(ip,port)
+    return port_live(ip,port)
 
 def terminate_reservation(reservation, region):
     terminate_instances([ i.id for i in reservation.instances ], region)
@@ -203,7 +216,7 @@ def wait_for_ssh(ips, port=22, skipAlive=True, requiredsuccess=3):
                 else:
                     count = 0
                 time.sleep(1)
-                h2o_cmd.dot()
+                dot()
 
 
 def dump_hosts_config(ec2_config, reservation, filename=DEFAULT_HOSTS_FILENAME):
@@ -220,7 +233,7 @@ def dump_hosts_config(ec2_config, reservation, filename=DEFAULT_HOSTS_FILENAME):
     if f: cfg['hdfs_config']  = f
     else: warn_file_miss(ec2_config['hdfs_config'])
     cfg['username']        = ec2_config['username'] 
-    cfg['use_flatfile']    = True
+    cfg['key_filename']    = find_file(ec2_config['pem'])
     cfg['h2o_per_host']    = 1
     cfg['java_heap_GB']    = MEMORY_MAPPING[ec2_config['instance_type']]['xmx']
     cfg['java_extra_args'] = '' # No default Java arguments '-XX:MaxDirectMemorySize=1g'

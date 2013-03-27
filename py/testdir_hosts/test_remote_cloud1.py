@@ -12,7 +12,7 @@ class Basic(unittest.TestCase):
     def setUpClass(cls):
         start = time.time()
         h2o_hosts.build_cloud_with_hosts(node_count, base_port=base_port, 
-            use_flatfile=True, java_heap_GB=1)
+            use_multicast=False, java_heap_GB=1)
         print "Cloud of", len(h2o.nodes), "built in", time.time()-start, "seconds"
         h2o.verify_cloud_size()
         h2o.check_sandbox_for_errors()
