@@ -39,7 +39,7 @@ python_test_name = inspect.stack()[1][1]
 def unit_main():
     global python_test_name
     python_test_name = inspect.stack()[1][1]
-    print "\nRunning: python", python_test_name
+    print "\nRunning: jy (jython)", python_test_name
     # moved clean_sandbox out of here, because nosetests doesn't execute h2o.unit_main in our tests.
     # UPDATE: ..is that really true? I'm seeing the above print in the console output runnning
     # jenkins with nosetests
