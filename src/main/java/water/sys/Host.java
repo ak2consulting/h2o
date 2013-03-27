@@ -104,7 +104,9 @@ public class Host {
       ProcessBuilder builder = new ProcessBuilder(args);
       builder.environment().put("CYGWIN", "nodosfilewarning");
       process = builder.start();
-      NodeVM.inheritIO(process, Log.padRight("rsync " + VM.localIP() + " -> " + _address + ": ", 24));
+      String log = "rsync " + VM.localIP() + " -> " + _address;
+      System.out.println(log);
+      NodeVM.inheritIO(process, Log.padRight(log + ": ", 24));
       process.waitFor();
     } catch( Exception ex ) {
       throw new RuntimeException(ex);

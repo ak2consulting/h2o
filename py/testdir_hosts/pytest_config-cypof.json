@@ -1,5 +1,15 @@
 {
-    "ec2_zone": "us-east-1",
+    "use_home_for_ice": true,
+    "inherit_io": true,
+
+    "h2o_per_host": 1,
+    "java_heap_GB": 28,
+
+    "hdfs_name_node": "192.168.1.176",
+    "hdfs_version": "cdh3u5",
+    "use_hdfs": true,
+
+    "ec2_region": "us-east-1",
     "ec2_type": "m1.xlarge",
     "ec2_count": 4,
 
@@ -13,16 +23,6 @@
         "**/cachedir",
         "**/sandbox"
     ],
-
-    "use_home_for_ice": true,
-    "inherit_io": true,
-
-    "h2o_per_host": 1,
-    "java_heap_GB": 28,
-
-    "hdfs_name_node": "192.168.1.176",
-    "hdfs_version": "cdh3u5",
-    "use_hdfs": true,
 
     "_ip": [
         "192.168.1.171",
