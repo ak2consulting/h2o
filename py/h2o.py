@@ -255,22 +255,6 @@ def decide_if_localhost():
 
     return True
 
-def build_cloud_in_process(node_count=1):
-    clean_sandbox()
-    node_list = []
-    
-    for i in xrange(node_count):
-        verboseprint("starting in-process node", i)
-        newNode = InProcessH2O()
-        node_list.append(newNode)
-
-    start = time.time()
-    # UPDATE: best to stabilize on the last node!
-    stabilize_cloud(node_list[-1], len(node_list))
-    verboseprint(len(node_list), "Last added node stabilized in ", time.time()-start, " secs")
-    verboseprint("Built cloud: %d node_list, in %d s" % (len(node_list), (time.time() - start))) 
-    nodes[:] = node_list
-
 # node_count is number of H2O instances per host if hosts is specified.
 def build_cloud(node_count=2, base_port=54321, hosts=None, 
         timeoutSecs=30, retryDelaySecs=0.5, cleanup=True, rand_shuffle=True, use_multicast=True, **kwargs):
@@ -303,8 +287,8 @@ def build_cloud(node_count=2, base_port=54321, hosts=None,
             for (h,p) in host_port_list:
                 verboseprint('starting remote node', totalNodes, 'via', h)
                 node_hosts = host_port_list
-                if use_multicast: node_hosts = None
-                newNode = h.remote_h2o(port=p, node_id=totalNodes, host_port_list=node_hosts, **kwargs)
+                if self.use_multicast: node_hosts = None
+                newNode = h.new_h2o(port=p, node_id=totalNodes, host_port_list=node_hosts, **kwargs)
                 node_list.append(newNode)
                 totalNodes += 1
                 # kbn try delay between each one?
@@ -1268,24 +1252,6 @@ class ExternalH2O(H2O):
         except:
             return False
 
-class InProcessH2O(H2O):
-    '''An H2O instance launched in a classloader in the current JVM'''
-    def __init__(self):
-        super(InProcessH2O, self).__init__()
-        self.rc = None
-        # FIX! no option for local /home/username ..always the sandbox (LOG_DIR)
-        self.ice = tmp_dir('ice.')
-        if self.node_id is not None:
-            logPrefix = 'in-process-h2o-' + str(self.node_id)
-        else:
-            logPrefix = 'in-process-h2o'
-        check_port_group(self.port)
-        self.node = NodeCL(self.get_node_args());
-        self.node.start();
-
-    def get_ice_dir(self):
-        return self.ice
-
 class LocalH2O(H2O):
     '''An H2O instance launched on the local host'''
     def __init__(self, *args, **kwargs):
@@ -1293,7 +1259,9 @@ class LocalH2O(H2O):
         self.rc = None
         # FIX! no option for local /home/username ..always the sandbox (LOG_DIR)
         self.ice = tmp_dir('ice.')
-        self.node = NodeVM(self.get_java_args(), self.get_node_args());
+        java_args = self.get_java_args()
+        node_args = self.get_node_args()
+        self.node = NodeVM(java_args, node_args);
 
         if self.node_id is not None:
             logPrefix = 'local-h2o-' + str(self.node_id)
@@ -1303,8 +1271,8 @@ class LocalH2O(H2O):
         errfd,errpath = tmp_file(logPrefix + '.stderr.', '.log')
         self.node.persistIO(outpath, errpath);
 
-        comment = 'stdout %s, stderr %s' % (os.path.basename(outpath), os.path.basename(errpath))        
-        log(' '.join(args), comment=comment)
+        comment = 'stdout %s, stderr %s' % (os.path.basename(outpath), os.path.basename(errpath))
+        log(' '.join(java_args) + ' ' + ' '.join(node_args), comment=comment)
 
         if self.inherit_io:
             self.node.inheritIO();
@@ -1317,11 +1285,18 @@ class LocalH2O(H2O):
     def stack_dump(self):
         self.ps.send_signal(signal.SIGQUIT)
 
+class LocalHost(Host):
+    def __init__(self, addr, **kwargs):
+        super(LocalHost, self).__init__(addr)
+
+    def new_h2o(self, *args, **kwargs):
+        return LocalH2O(self, *args, **kwargs)
+
 class RemoteHost(Host):
     def __init__(self, addr, user, key, **kwargs):
         super(RemoteHost, self).__init__(addr, user, key)
 
-    def remote_h2o(self, *args, **kwargs):
+    def new_h2o(self, *args, **kwargs):
         return RemoteH2O(self, *args, **kwargs)
 
     def __str__(self):

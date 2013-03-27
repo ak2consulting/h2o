@@ -1,11 +1,6 @@
 {
-    "username": "0xdiag", 
-    "key_filename": "0xdiag_rsa", 
-
     "use_home_for_ice": true,
     "inherit_io": true,
-    
-    "aws_credentials": "../test/AwsCredentials.properties",
 
     "h2o_per_host": 1,
     "java_heap_GB": 28,
@@ -13,6 +8,21 @@
     "hdfs_name_node": "192.168.1.176",
     "hdfs_version": "cdh3u5",
     "use_hdfs": true,
+
+    "ec2_region": "us-east-1",
+    "ec2_type": "m1.xlarge",
+    "ec2_count": 4,
+
+    "ec2_rsync_includes": [
+        "py",
+        "smalldata",
+        "AwsCredentials.properties"
+    ],
+    "ec2_rsync_excludes": [
+        "py/**.class",
+        "**/cachedir",
+        "**/sandbox"
+    ],
 
     "_ip": [
         "192.168.1.171",
@@ -27,7 +37,7 @@
         "192.168.1.180"
     ],
 
-    "ip": [
+    "__ip": [
         "192.168.1.150", 
         "192.168.1.151", 
         "192.168.1.152", 

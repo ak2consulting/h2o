@@ -4,16 +4,117 @@ import java.io.*;
 import java.util.*;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang.ArrayUtils;
 
-import water.H2O;
+import water.*;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.*;
+import com.google.gson.Gson;
 
 public abstract class EC2 {
   private static final String USER = System.getProperty("user.name");
   private static final String NAME = USER + "-H2O-Cloud";
+
+  public class Config {
+    String   ec2_region = "us-east-1";
+    String   ec2_type   = "m1.xlarge";
+    int      ec2_count;
+    String[] ec2_rsync_includes;
+    String[] ec2_rsync_excludes;
+  }
+
+  /**
+   * Can be invoked with args:<br>
+   * - Config.json<br>
+   * - Python file, or Java class name<br>
+   * - Optional additional args
+   */
+  public static void main(String[] args) throws Exception {
+    Gson json = new Gson();
+    Config config = json.fromJson(new FileReader(args[0]), Config.class);
+    Cloud c = resize(config.ec2_count, config.ec2_type, config.ec2_region);
+
+    // Take first box as cloud master
+    Host master = new Host(c.publicIPs()[0]);
+    String[] includes = (String[]) ArrayUtils.addAll(Host.defaultIncludes(), config.ec2_rsync_includes);
+    String[] excludes = (String[]) ArrayUtils.addAll(Host.defaultExcludes(), config.ec2_rsync_excludes);
+    master.rsync(includes, excludes);
+
+    // TODO parse Java args from config
+
+    ArrayList<String> list = new ArrayList<String>();
+    list.add("-mainClass");
+    list.add(Master.class.getName());
+
+    String hosts = "";
+    for( String ip : c.privateIPs() )
+      hosts += ip + ",";
+    list.add("-hosts");
+    list.add(hosts);
+
+    list.addAll(Arrays.asList(args));
+    RemoteRunner.launch(master, list.toArray(new String[0]));
+  }
+
+  /**
+   * Runs on the first EC2 box.
+   */
+  public static class Master {
+    public static void main(String[] args) throws Exception {
+      VM.exitWithParent();
+
+      ArrayList<Node> workers = new ArrayList<Node>();
+      assert args[0].equals("-hosts");
+      String[] ips = args[1].split(",");
+
+      ArrayList<String> workersArgs = new ArrayList<String>();
+      workersArgs.add(args[0]);
+      workersArgs.add(args[1]);
+      workersArgs.add("--log_headers");
+      for( int i = 1; i < ips.length; i++ ) {
+        Host host = new Host(ips[i]);
+        workers.add(new NodeHost(host, null, workersArgs.toArray(new String[0])));
+      }
+
+      HashSet<Host> hosts = new HashSet<Host>();
+      for( Node w : workers )
+        if( w instanceof NodeHost )
+          hosts.add(((NodeHost) w).host());
+      Cloud.rsync(hosts.toArray(new Host[0]));
+
+      for( Node w : workers ) {
+        w.inheritIO();
+        w.start();
+      }
+
+      ArrayList<String> list = new ArrayList<String>();
+      list.add(args[0]);
+      list.add(args[1]);
+      // TODO interpret rest of config in Java?
+      // args[2]
+      list.add("--log_headers");
+      H2O.main(list.toArray(new String[0]));
+
+      if( args.length > 3 ) {
+        TestUtil.stall_till_cloudsize(1 + workers.size());
+        String main;
+        String[] mainArgs;
+
+        if( args[3].endsWith(".py") ) {
+          main = Jython.class.getName();
+          mainArgs = Arrays.copyOfRange(args, 3, args.length);
+        } else {
+          main = args[3];
+          mainArgs = Arrays.copyOfRange(args, 4, args.length);
+        }
+
+        Class c = Boot._init.loadClass(main, true);
+        c.getMethod("main", String[].class).invoke(null, (Object) mainArgs);
+      }
+    }
+  }
 
   /**
    * Create or terminate EC2 instances. Uses their Name tag to find existing ones.
@@ -55,7 +156,8 @@ public abstract class EC2 {
 
       request.withMinCount(count - instances.size()).withMaxCount(count - instances.size());
       request.withSecurityGroupIds("ssh");
-      // request.withPlacement(new Placement(region + "c")); // All in same Availability Zone
+      // TODO what's the right way to have boxes in same availability zone?
+      // request.withPlacement(new Placement(region + "c"));
       request.withUserData(new String(Base64.encodeBase64(cloudConfig().getBytes())));
 
       RunInstancesResult runInstances = ec2.runInstances(request);

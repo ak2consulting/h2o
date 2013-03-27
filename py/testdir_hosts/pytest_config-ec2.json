@@ -1,0 +1,22 @@
+{
+    "use_home_for_ice": true,
+    "inherit_io": true,
+
+    "h2o_per_host": 1,
+    "java_heap_GB": 28,
+
+    "ec2_region": "us-east-1",
+    "ec2_type": "m1.xlarge",
+    "ec2_count": 4,
+
+    "ec2_rsync_includes": [
+        "py",
+        "smalldata",
+        "AwsCredentials.properties"
+    ],
+    "ec2_rsync_excludes": [
+        "py/**.class",
+        "**/cachedir",
+        "**/sandbox"
+    ]
+}

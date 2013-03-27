@@ -18,6 +18,7 @@ def build_cloud_with_hosts(node_count=None,
     base_port=None,
     java_heap_GB=None, java_heap_MB=None, java_extra_args=None,
     use_multicast=True,
+    ip='127.0.0.1',
     **kwargs):
 
     # For seeing example of what we want in the json, if we add things
@@ -36,7 +37,7 @@ def build_cloud_with_hosts(node_count=None,
          hostDict = json.load(fp)
 
     slow_connection = hostDict.setdefault('slow_connection', False)
-    hostList = hostDict.setdefault('ip','127.0.0.1')
+    hostList = hostDict.setdefault('ip',ip)
 
     h2oPerHost = hostDict.setdefault('h2o_per_host', 2)
     # default should avoid colliding with sri's demo cloud ports: 54321
@@ -121,7 +122,10 @@ def build_cloud_with_hosts(node_count=None,
             key = None
             if(key_filename is not None):
                 key = h2o.find_file(key_filename)
-            hosts.append(h2o.RemoteHost(addr=h, user=username, key=key))
+            if h == "127.0.0.1":
+                hosts.append(h2o.LocalHost(addr=h))
+            else:
+                hosts.append(h2o.RemoteHost(addr=h, user=username, key=key))
 
     timeoutSecs = 60
 

@@ -46,26 +46,28 @@ public class Host {
     return _key;
   }
 
-  public static List<String> defaultIncludes() {
+  public static String[] defaultIncludes() {
     ArrayList<String> l = new ArrayList<String>();
     if( Boot._init.fromJar() ) {
-      String[] cp = System.getProperty("java.class.path").split(File.pathSeparator);
-      l.addAll(Arrays.asList(cp));
+      if( new File("target/h2o.jar").exists() )
+        l.add("target/h2o.jar");
+      else
+        l.add("h2o.jar");
     } else {
       l.add("target");
       l.add("lib");
     }
-    return l;
+    return l.toArray(new String[0]);
   }
 
-  public static List<String> defaultExcludes() {
+  public static String[] defaultExcludes() {
     ArrayList<String> l = new ArrayList<String>();
     if( !Boot._init.fromJar() ) {
       l.add("target/*.jar");
       l.add("lib/javassist");
       l.add("**/*-sources.jar");
     }
-    return l;
+    return l.toArray(new String[0]);
   }
 
   public void rsync(Collection<String> includes, Collection<String> excludes) {
@@ -78,7 +80,7 @@ public class Host {
       ArrayList<String> args = new ArrayList<String>();
       File onWindows = new File("C:/cygwin/bin/rsync.exe");
       args.add(onWindows.exists() ? onWindows.getAbsolutePath() : "rsync");
-      args.add("-vrzute");
+      args.add("-qvrzute");
       args.add(sshWithArgs());
       args.add("--chmod=u=rwx");
 
@@ -104,7 +106,9 @@ public class Host {
       ProcessBuilder builder = new ProcessBuilder(args);
       builder.environment().put("CYGWIN", "nodosfilewarning");
       process = builder.start();
-      NodeVM.inheritIO(process, Log.padRight("rsync " + VM.localIP() + " -> " + _address + ": ", 24));
+      String log = "rsync " + VM.localIP() + " -> " + _address;
+      System.out.println(log);
+      NodeVM.inheritIO(process, Log.padRight(log + ": ", 24));
       process.waitFor();
     } catch( Exception ex ) {
       throw new RuntimeException(ex);

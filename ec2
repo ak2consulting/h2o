@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+SEP=":"
+H2O=$(dirname $0)
+case "`uname`" in
+  CYGWIN*) SEP=";";H2O=$(cygpath -w $H2O);;
+esac
+
+#-agentlib:jdwp=transport=dt_socket,server=y,address=8000,suspend=y
+echo java -ea -cp $H2O/target/h2o.jar water.sys.EC2 $@
+java -ea -cp $H2O/target/h2o.jar water.Boot -mainClass water.sys.EC2 $@
+

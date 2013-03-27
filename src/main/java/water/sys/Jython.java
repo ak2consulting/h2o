@@ -13,11 +13,11 @@ public class Jython {
     list.add("-Dpython.options.includeJavaStackInExceptions=true");
     list.add("-Dpython.options.showJavaExceptions=true");
     list.add("-Dpython.options.showPythonProxyExceptions=true");
-    list.add("-Dpython.path=py;py/Lib");
+    list.add("-Dpython.path=py:py/Lib");
     list.add("-S");
     list.addAll(Arrays.asList(args));
 
-    // Reflection: Jython is not a dependency during build
+    // Use reflection: Jython is not a dependency during build
     Class c = Class.forName("org.python.util.jython");
     c.getMethod("run", String[].class).invoke(null, (Object) list.toArray(new String[0]));
   }
