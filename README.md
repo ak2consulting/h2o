@@ -80,7 +80,6 @@ Systems, Data, FileSystems and Hadoop
 Doug Lea
 Chris Pouliot
 Dhruba Borthakur
-Charles Zedlewski
 Niall Dalton
 ```
 
