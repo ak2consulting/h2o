@@ -10,10 +10,10 @@ def write_syn_dataset(csvPathname, rowCount, colCount, SEED):
 
     # getting correlated results?
     r1 = random.Random(SEED)
-    r1.jumpahead(922377089)   
+    ### r1.jumpahead(922377089)   
 
     r2 = random.Random(SEED)
-    r2.jumpahead(488915466)
+    ### r2.jumpahead(488915466)
     dsf = open(csvPathname, "w+")
 
     for i in range(rowCount):
@@ -43,7 +43,7 @@ class Basic(unittest.TestCase):
         print "\nUsing random seed:", SEED
         localhost = h2o.decide_if_localhost()
         if (localhost):
-            h2o.build_cloud(1,use_flatfile=True)
+            h2o.build_cloud(1)
         else:
             h2o_hosts.build_cloud_with_hosts()
 

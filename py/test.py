@@ -5,6 +5,8 @@ import h2o_cmd
 import h2o
 import h2o_browse as h2b
 
+from water.sys import VM
+
 class Basic(unittest.TestCase):
     def tearDown(self):
         h2o.check_sandbox_for_errors()
@@ -36,7 +38,8 @@ class Basic(unittest.TestCase):
     def test_E_ParseManyCols(self):
         csvPathname=h2o.find_file('smalldata/fail1_100x11000.csv.gz')
         parseKey = h2o_cmd.parseFile(None, csvPathname, timeoutSecs=10)
-        inspect = h2o_cmd.runInspect(None, parseKey['destination_key'], offset=-1, view=5)
+        # JSON is 1.7MB, takes forever to parse on Jython
+        h2o.nodes[0].inspect_no_json(parseKey['destination_key'])
 
     def test_F_StoreView(self):
         storeView = h2o.nodes[0].store_view()
@@ -51,16 +54,15 @@ class Basic(unittest.TestCase):
                 'java',
                 '-Dh2o.arg.ice_root='+h2o.tmp_dir('ice.'),
                 '-Dh2o.arg.name='+h2o.cloud_name(),
-                '-Dh2o.arg.ip='+h2o.get_ip_address(),
+                '-Dh2o.arg.ip='+VM.localIP(),
                 '-ea', '-jar', h2o.find_file('target/h2o.jar'),
                 '-mainClass', 'org.junit.runner.JUnitCore',
                 # The tests
                 'water.ConcurrentKeyTest',
                 'hex.MinorityClassTest',
-                'water.exec.RBigDataTest',
-                'water.parser.ParseFolderTestBig'
+                'water.exec.RBigDataTest'
                 ])
-        rc = ps.wait(None)
+        rc = ps.wait()
         out = file(stdout).read()
         err = file(stderr).read()
         if rc is None:

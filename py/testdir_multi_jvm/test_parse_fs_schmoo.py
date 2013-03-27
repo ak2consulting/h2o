@@ -27,7 +27,7 @@ class glm_same_parse(unittest.TestCase):
         # fails with 3
         localhost = h2o.decide_if_localhost()
         if (localhost):
-            h2o.build_cloud(3,java_heap_GB=4,use_flatfile=True)
+            h2o.build_cloud(3,java_heap_GB=4,use_multicast=False)
         else:
             h2o_hosts.build_cloud_with_hosts()
 

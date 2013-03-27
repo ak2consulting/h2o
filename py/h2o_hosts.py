@@ -1,7 +1,7 @@
 import getpass, json, h2o
 import random, os
 # UPDATE: all multi-machine testing will pass list of IP and base port addresses to H2O
-# means we won't realy on h2o self-discovery of cluster
+# means we won't really on h2o self-discovery of cluster
 
 def find_config(base):
     f = base
@@ -13,16 +13,18 @@ def find_config(base):
 
 # None means the json will specify, or the default for json below
 # only these two args override for now. can add more.
-def build_cloud_with_hosts(node_count=None, use_flatfile=None, 
+def build_cloud_with_hosts(node_count=None,
     use_hdfs=None, hdfs_name_node=None, hdfs_config=None,  hdfs_version=None,
     base_port=None,
     java_heap_GB=None, java_heap_MB=None, java_extra_args=None,
+    use_multicast=True,
     **kwargs):
 
     # For seeing example of what we want in the json, if we add things
     #   import h2o_config
 
     # allow user to specify the config json at the command line. config_json is a global.
+    # shouldn't need this??
     if h2o.config_json:
         configFilename = find_config(h2o.config_json)
     else:
@@ -43,12 +45,11 @@ def build_cloud_with_hosts(node_count=None, use_flatfile=None,
     # at least for the hosts case
     offset = random.randint(0,31)
     basePort = hostDict.setdefault('base_port', 55300 + offset)
-    username = hostDict.setdefault('username','0xdiag')
-    # stupid but here for clarity
-    password = hostDict.setdefault('password', None)
-    sigar = hostDict.setdefault('sigar', False)
 
-    useFlatfile = hostDict.setdefault('use_flatfile', False)
+    username = hostDict.setdefault('username', None)
+    key_filename = hostDict.setdefault('key_filename', None)
+    
+    use_multicast = hostDict.setdefault('use_multicast', use_multicast)
 
     useHdfs = hostDict.setdefault('use_hdfs', False)
     hdfsNameNode = hostDict.setdefault('hdfs_name_node', '192.168.1.151')
@@ -63,21 +64,18 @@ def build_cloud_with_hosts(node_count=None, use_flatfile=None,
 
     use_home_for_ice = hostDict.setdefault('use_home_for_ice', False)
 
-    # key file
-    key_filename = hostDict.setdefault('key_filename', None)
     # host aws configuration
     aws_credentials = hostDict.setdefault('aws_credentials', None)
     # a little hack to redirect import folder tests to an s3 folder
     redirect_import_folder_to_s3_path = hostDict.setdefault('redirect_import_folder_to_s3_path', None)
 
+    inherit_io = hostDict.setdefault('inherit_io', False)
+
     # can override the json with a caller's argument
-    # FIX! and we support passing othe kwargs from above? but they don't override
+    # FIX! and we support passing the kwargs from above? but they don't override
     # json, ...so have to fix here if that's desired
     if node_count is not None:
         h2oPerHost = node_count
-
-    if use_flatfile is not None:
-        useFlatfile = use_flatfile
 
     if use_hdfs is not None:
         useHdfs = use_hdfs
@@ -103,10 +101,10 @@ def build_cloud_with_hosts(node_count=None, use_flatfile=None,
     if base_port is not None:
         basePort = base_port
 
-    h2o.verboseprint("host config: ", username, password, 
-        h2oPerHost, basePort, sigar, useFlatfile, 
+    h2o.verboseprint("host config: ", username,
+        h2oPerHost, basePort,
         useHdfs, hdfsNameNode, hdfsVersion, hdfsConfig, javaHeapGB, javaHeapMB, use_home_for_ice,
-        hostList, key_filename, aws_credentials, **kwargs)
+        hostList, use_multicast, key_filename, aws_credentials, inherit_io, **kwargs)
 
     #********************
     global hosts
@@ -120,28 +118,22 @@ def build_cloud_with_hosts(node_count=None, use_flatfile=None,
         hosts = []
         for h in hostList:
             h2o.verboseprint("Connecting to:", h)
-            hosts.append(h2o.RemoteHost(addr=h, username=username, password=password, key_filename=key_filename))
-   
-    # handles hosts=None correctly
-    h2o.write_flatfile(node_count=h2oPerHost, base_port=basePort, hosts=hosts)
+            key = None
+            if(key_filename is not None):
+                key = h2o.find_file(key_filename)
+            hosts.append(h2o.RemoteHost(addr=h, user=username, key=key))
 
-    if hosts is not None:
-        # this uploads the flatfile too
-        h2o.upload_jar_to_remote_hosts(hosts, slow_connection=slow_connection)
-        # timeout wants to be larger for large numbers of hosts * h2oPerHost
-        # use 60 sec min, 5 sec per node.
-        timeoutSecs = max(60, 8*(len(hosts) * h2oPerHost))
-    else: # for 127.0.0.1 case
-        timeoutSecs = 60
+    timeoutSecs = 60
 
     # sandbox gets cleaned in build_cloud
     h2o.build_cloud(h2oPerHost,
-            base_port=basePort, hosts=hosts, timeoutSecs=timeoutSecs, sigar=sigar, 
-            use_flatfile=useFlatfile,
+            base_port=basePort, hosts=hosts, timeoutSecs=timeoutSecs,
+            use_multicast=use_multicast,
             use_hdfs=useHdfs, hdfs_name_node=hdfsNameNode,
             hdfs_version=hdfsVersion, hdfs_config=hdfsConfig,
             java_heap_GB=javaHeapGB, java_heap_MB=javaHeapMB, java_extra_args=javaExtraArgs,
             use_home_for_ice=use_home_for_ice,
             aws_credentials=aws_credentials,
+            inherit_io=inherit_io,
             redirect_import_folder_to_s3_path=redirect_import_folder_to_s3_path,
             **kwargs)

@@ -1,6 +1,8 @@
 import os, json, unittest, time, shutil, sys, getpass
 import h2o
 
+from water.sys import VM
+
 class JUnit(unittest.TestCase):
     def testScoring(self):
         (ps, stdout, stderr) = h2o.spawn_cmd('junit', [
@@ -12,7 +14,7 @@ class JUnit(unittest.TestCase):
                 'water.score.ScoreTest',
                 ])
 
-        rc = ps.wait(None)
+        rc = ps.wait()
         out = file(stdout).read()
         err = file(stderr).read()
         if rc is None:
@@ -32,7 +34,7 @@ class JUnit(unittest.TestCase):
                     'java',
                     '-Dh2o.arg.ice_root='+h2o.tmp_dir('ice.'),
                     '-Dh2o.arg.name='+h2o.cloud_name(),
-                    '-Dh2o.arg.ip='+h2o.get_ip_address(),
+                    '-Dh2o.arg.ip='+VM.localIP(),
                     '-ea', '-jar', h2o.find_file('target/h2o.jar'),
                     '-mainClass', 'org.junit.runner.JUnitCore',
                     # The tests
@@ -56,7 +58,7 @@ class JUnit(unittest.TestCase):
                     'water.parser.ParseFolderTest'
                     ])
 
-            rc = ps.wait(None)
+            rc = ps.wait()
             out = file(stdout).read()
             err = file(stderr).read()
             if rc is None:
@@ -69,7 +71,7 @@ class JUnit(unittest.TestCase):
             h2o.tear_down_cloud()
 
 
-    #def testMore(self):
+    # def testMore(self):
     #        (ps, stdout, stderr) = h2o.spawn_cmd('junit', [
     #                'java',
     #                '-ea', '-jar', h2o.find_file('target/h2o.jar'),

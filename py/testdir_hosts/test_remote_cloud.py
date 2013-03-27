@@ -25,8 +25,6 @@ def check_cloud_and_setup_next():
     # stick port issues (os)
     # wait a little for jvms to really clear out?
     # and increment the base_port
-    # if we change the port we have to upload the flatfile again
-    # maybe just use_flatfile=false
     ### global base_port
     ### base_port += portsPerNode * node_count
 
@@ -42,10 +40,9 @@ class Basic(unittest.TestCase):
         print "base_port:", base_port
         h2o.check_port_group(base_port)
         start = time.time()
-        # writes it's own flatfile
         h2o_hosts.build_cloud_with_hosts(node_count, base_port=base_port, 
-            use_flatfile=True, java_heap_GB=1)
-        print "jar/flatfile copied and Cloud of", len(h2o.nodes), "built in", time.time()-start, "seconds"
+            use_multicast=False, java_heap_GB=1)
+        print "Cloud of", len(h2o.nodes), "built in", time.time()-start, "seconds"
         # have to remember total # of nodes for the next class. it will stay the same
         # when we tear down the cloud, we zero the nodes list
         global totalNodes
@@ -61,20 +58,15 @@ class Basic(unittest.TestCase):
         # FIX! we should increment this from 1 to N? 
         for i in range(1,10):
             # timeout wants to be larger for large numbers of hosts * node_count
-            # don't want to reload jar/flatfile, so use build_cloud
             ### base_port += portsPerNode * node_count
             print "base_port:", base_port
             timeoutSecs = max(60, 8 * totalNodes)
             print "totalNodes:", totalNodes, "timeoutSecs:", timeoutSecs
 
             h2o.check_port_group(base_port)
-            # FIX! would have to recopy the flatfile if we change base_port? hmm.. won't work
-            ### h2o.write_flatfile(node_count=node_count, base_port=base_port)
             
-            # FIX! ..just use_flatfile=False for now on these subsequent ones. rely on multicast
-            # Could make the biggest cloud first and count down? supposed to not matter if flatfile has too many?
             start = time.time()
-            h2o.build_cloud(node_count, base_port=base_port, hosts=h2o_hosts.hosts, use_flatfile=False, 
+            h2o.build_cloud(node_count, base_port=base_port, hosts=h2o_hosts.hosts, use_multicast=True, 
                 timeoutSecs=timeoutSecs, retryDelaySecs=0.5)
             print "Cloud of", len(h2o.nodes), "built in", time.time()-start, "seconds"
             check_cloud_and_setup_next()
