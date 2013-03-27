@@ -287,7 +287,7 @@ def build_cloud(node_count=2, base_port=54321, hosts=None,
             for (h,p) in host_port_list:
                 verboseprint('starting remote node', totalNodes, 'via', h)
                 node_hosts = host_port_list
-                if self.use_multicast: node_hosts = None
+                if use_multicast: node_hosts = None
                 newNode = h.new_h2o(port=p, node_id=totalNodes, host_port_list=node_hosts, **kwargs)
                 node_list.append(newNode)
                 totalNodes += 1
