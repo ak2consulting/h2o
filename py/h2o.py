@@ -273,7 +273,7 @@ def build_cloud_in_process(node_count=1):
 
 # node_count is number of H2O instances per host if hosts is specified.
 def build_cloud(node_count=2, base_port=54321, hosts=None, 
-        timeoutSecs=30, retryDelaySecs=0.5, cleanup=True, rand_shuffle=True, **kwargs):
+        timeoutSecs=30, retryDelaySecs=0.5, cleanup=True, rand_shuffle=True, use_multicast=True, **kwargs):
     # moved to here from unit_main. so will run with nosetests too!
     clean_sandbox()
     ports_per_node = 2
@@ -303,7 +303,7 @@ def build_cloud(node_count=2, base_port=54321, hosts=None,
             for (h,p) in host_port_list:
                 verboseprint('starting remote node', totalNodes, 'via', h)
                 node_hosts = host_port_list
-                if self.use_multicast: node_hosts = None
+                if use_multicast: node_hosts = None
                 newNode = h.remote_h2o(port=p, node_id=totalNodes, host_port_list=node_hosts, **kwargs)
                 node_list.append(newNode)
                 totalNodes += 1
