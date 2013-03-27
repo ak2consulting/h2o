@@ -156,8 +156,8 @@ public abstract class EC2 {
 
       request.withMinCount(count - instances.size()).withMaxCount(count - instances.size());
       request.withSecurityGroupIds("ssh");
-      // TODO better way to have boxes in same availability zone?
-      request.withPlacement(new Placement(region + "c"));
+      // TODO what's the right way to have boxes in same availability zone?
+      // request.withPlacement(new Placement(region + "c"));
       request.withUserData(new String(Base64.encodeBase64(cloudConfig().getBytes())));
 
       RunInstancesResult runInstances = ec2.runInstances(request);

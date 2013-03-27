@@ -49,8 +49,10 @@ public class Host {
   public static String[] defaultIncludes() {
     ArrayList<String> l = new ArrayList<String>();
     if( Boot._init.fromJar() ) {
-      String[] cp = System.getProperty("java.class.path").split(File.pathSeparator);
-      l.addAll(Arrays.asList(cp));
+      if( new File("target/h2o.jar").exists() )
+        l.add("target/h2o.jar");
+      else
+        l.add("h2o.jar");
     } else {
       l.add("target");
       l.add("lib");
