@@ -45,6 +45,7 @@ class Basic(unittest.TestCase):
         storeView = h2o.nodes[0].store_view()
 
     def test_G_Slower_JUNIT(self):
+        print "Now running some junit tests."
         h2o.tear_down_cloud()
         h2o.build_cloud(node_count=2)
         # we don't have the port or ip configuration here
