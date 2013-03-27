@@ -1338,7 +1338,8 @@ class RemoteH2O(H2O):
             self.aws_credentials = "/home/" + host.user() + '/' + Host.FOLDER + '/' + basename(self.aws_credentials)
 
         if self.hdfs_config:
-            self.hdfs_config = host.upload_file(self.hdfs_config)
+            host.rsync({ self.hdfs_config }, None)
+            self.hdfs_config = "/home/" + host.user() + '/' + Host.FOLDER + '/' + basename(self.hdfs_config)
 
         if self.use_home_for_ice:
             # this will be the username used to ssh to the host
