@@ -1,22 +1,17 @@
 import time, os, json, signal, tempfile, shutil, datetime, inspect, threading, os.path, getpass
-import requests, psutil, argparse, sys, unittest
+import argparse, sys, unittest
 import glob
 import h2o_browse as h2b
 import re
-import webbrowser
-import random
+import random, copy
 # used in shutil.rmtree permission hack for windows
 import errno
 
-# For checking ports in use, using netstat thru a subprocess.
 from subprocess import Popen, PIPE
-
-# The cloud is uniquely named per user (only)
-# Fine to uniquely identify the flatfile by name only also?
-# Both are the user that runs the test. The config might have a different username on the
-# remote machine (0xdiag, say, or hduser)
-def flatfile_name():
-    return('pytest_flatfile-%s' %getpass.getuser())
+from water.sys import Node, NodeCL, NodeVM, NodeHost, Host, Cloud
+from water.sys.Jython import http
+from java.io import IOException
+from javapath import basename
 
 def cloud_name():
     return('pytest-%s-%s' % (getpass.getuser(), os.getpid()))
@@ -199,68 +194,37 @@ def make_syn_dir():
 def dump_json(j):
     return json.dumps(j, sort_keys=True, indent=2)
 
-# Hackery: find the ip address that gets you to Google's DNS
-# Trickiness because you might have multiple IP addresses (Virtualbox), or Windows.
-# we used to not like giving ip 127.0.0.1 to h2o?
-def get_ip_address():
-    if ipaddr:
-        verboseprint("get_ip case 1:", ipaddr)
-        return ipaddr
-
-    import socket
-    ip = '127.0.0.1'
-    # this method doesn't work if vpn is enabled..it gets the vpn ip
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8',0))
-        ip = s.getsockname()[0]
-        verboseprint("get_ip case 2:", ip)
-    except:
-        pass
-
-    if ip.startswith('127'):
-        ip = socket.getaddrinfo(socket.gethostname(), None)[0][4][0]
-        verboseprint("get_ip case 3:", ip)
-
-    ipa = None
-    for ips in socket.gethostbyname_ex(socket.gethostname())[2]:
-         # only take the first 
-         if ipa is None and not ips.startswith("127."):
-            ipa = ips[:]
-            verboseprint("get_ip case 4:", ipa)
-            if ip != ipa:
-                print "\nAssuming", ip, "is the ip address h2o will use but", ipa, "is probably the real ip?"
-                print "You might have a vpn active. Best to use '-ip "+ipa+"' to get python and h2o the same."
-
-    verboseprint("get_ip_address:", ip) 
-    return ip
+def spawn_clone(javaArgs, nodeArgs):
+    n = NodeVM(javaArgs, nodeArgs);
+    # n.inheritIO();
+    n.start();
+    return n
 
 def spawn_cmd(name, args, capture_output=True):
     if capture_output:
         outfd,outpath = tmp_file(name + '.stdout.', '.log')
         errfd,errpath = tmp_file(name + '.stderr.', '.log')
-        ps = psutil.Popen(args, stdin=None, stdout=outfd, stderr=errfd)
+        ps = Popen(args, stdin=None, stdout=outfd, stderr=errfd)
     else:
         outpath = '<stdout>'
         errpath = '<stderr>'
-        ps = psutil.Popen(args)
+        ps = Popen(args)
 
-    comment = 'PID %d, stdout %s, stderr %s' % (
-        ps.pid, os.path.basename(outpath), os.path.basename(errpath))
+    comment = 'stdout %s, stderr %s' % (os.path.basename(outpath), os.path.basename(errpath))
     log(' '.join(args), comment=comment)
     return (ps, outpath, errpath)
 
-def spawn_cmd_and_wait(name, args, timeout=None):
+def spawn_cmd_and_wait(name, args):
     (ps, stdout, stderr) = spawn_cmd(name, args)
 
-    rc = ps.wait(timeout)
+    rc = ps.wait()
     out = file(stdout).read()
     err = file(stderr).read()
 
     if rc is None:
         ps.terminate()
-        raise Exception("%s %s timed out after %d\nstdout:\n%s\n\nstderr:\n%s" %
-                (name, args, timeout or 0, out, err))
+        raise Exception("%s %s timed out stdout:\n%s\n\nstderr:\n%s" %
+                (name, args, out, err))
     elif rc != 0:
         raise Exception("%s %s failed.\nstdout:\n%s\n\nstderr:\n%s" % (name, args, out, err))
 
@@ -270,55 +234,6 @@ json_url_history = []
 
 global nodes
 nodes = []
-
-# I suppose we could shuffle the flatfile order!
-# but it uses hosts, so if that got shuffled, we got it covered?
-# the i in xrange part is not shuffled. maybe create the list first, for possible random shuffle
-# FIX! default to random_shuffle for now..then switch to not.
-def write_flatfile(node_count=2, base_port=54321, hosts=None, rand_shuffle=True):
-    # always create the flatfile. 
-    ports_per_node = 2
-    pff = open(flatfile_name(), "w+")
-    # doing this list outside the loops so we can shuffle for better test variation
-    hostPortList = []
-    if hosts is None:
-        ip = get_ip_address()
-        for i in range(node_count):
-            hostPortList.append("/" + ip + ":" + str(base_port + ports_per_node*i))
-    else:
-        for h in hosts:
-            for i in range(node_count):
-                hostPortList.append("/" + h.addr + ":" + str(base_port + ports_per_node*i))
-
-    # note we want to shuffle the full list of host+port
-    if rand_shuffle: 
-        random.shuffle(hostPortList)
-    for hp in hostPortList:
-        pff.write(hp + "\n")
-    pff.close()
-
-
-def check_port_group(base_port):
-    # UPDATE: don't do this any more
-    # for now, only check for jenkins or kevin
-    if (1==1):
-        username = getpass.getuser()
-        if username=='jenkins' or username=='kevin' or username=='michal':
-            # assumes you want to know about 3 ports starting at base_port
-            command1Split = ['netstat', '-anp']
-            command2Split = ['egrep']
-            # colon so only match ports. space at end? so no submatches
-            command2Split.append("(%s | %s)" % (base_port, base_port+1) )
-            command3Split = ['wc','-l']
-
-            print "Checking 2 ports starting at ", base_port
-            print ' '.join(command2Split)
-
-            # use netstat thru subprocess
-            p1 = Popen(command1Split, stdout=PIPE)
-            p2 = Popen(command2Split, stdin=p1.stdout, stdout=PIPE)
-            output = p2.communicate()[0]
-            print output
 
 def default_hosts_file():
     return 'pytest_config-{0}.json'.format(getpass.getuser())
@@ -340,46 +255,56 @@ def decide_if_localhost():
 
     return True
 
-# node_count is per host if hosts is specified.
+def build_cloud_in_process(node_count=1):
+    clean_sandbox()
+    node_list = []
+    
+    for i in xrange(node_count):
+        verboseprint("starting in-process node", i)
+        newNode = InProcessH2O()
+        node_list.append(newNode)
+
+    start = time.time()
+    # UPDATE: best to stabilize on the last node!
+    stabilize_cloud(node_list[-1], len(node_list))
+    verboseprint(len(node_list), "Last added node stabilized in ", time.time()-start, " secs")
+    verboseprint("Built cloud: %d node_list, in %d s" % (len(node_list), (time.time() - start))) 
+    nodes[:] = node_list
+
+# node_count is number of H2O instances per host if hosts is specified.
 def build_cloud(node_count=2, base_port=54321, hosts=None, 
         timeoutSecs=30, retryDelaySecs=0.5, cleanup=True, rand_shuffle=True, **kwargs):
     # moved to here from unit_main. so will run with nosetests too!
     clean_sandbox()
-    ports_per_node = 2 
+    ports_per_node = 2
     node_list = []
     try:
         # if no hosts list, use psutil method on local host.
         totalNodes = 0
         # doing this list outside the loops so we can shuffle for better test variation
-        # this jvm startup shuffle is independent from the flatfile shuffle
         portList = [base_port + ports_per_node*i for i in range(node_count)]
         if hosts is None:
-            # if use_flatfile, we should create it, 
-            # because tests will just call build_cloud with use_flatfile=True
-            # best to just create it all the time..may or may not be used 
-            write_flatfile(node_count=node_count, base_port=base_port)
             hostCount = 1
             if rand_shuffle: random.shuffle(portList)
             for p in portList:
-                verboseprint("psutil starting node", i)
+                verboseprint("starting local node", i)
                 newNode = LocalH2O(port=p, node_id=totalNodes, **kwargs)
                 node_list.append(newNode)
                 totalNodes += 1
         else:
-            # if hosts, the flatfile was created and uploaded to hosts already
-            # I guess don't recreate it, don't overwrite the one that was copied beforehand.
-            # we don't always use the flatfile (use_flatfile=False)
-            # Suppose we could dispatch from the flatfile to match it's contents
-            # but sometimes we want to test with a bad/different flatfile then we invoke h2o?
+            Cloud.rsync(hosts)
+
             hostCount = len(hosts)
-            hostPortList = []
+            host_port_list = []
             for h in hosts:
                 for port in portList:
-                    hostPortList.append( (h,port) )
-            if rand_shuffle: random.shuffle(hostPortList)
-            for (h,p) in hostPortList:
-                verboseprint('ssh starting node', totalNodes, 'via', h)
-                newNode = h.remote_h2o(port=p, node_id=totalNodes, **kwargs)
+                    host_port_list.append( (h,port) )
+            if rand_shuffle: random.shuffle(host_port_list)
+            for (h,p) in host_port_list:
+                verboseprint('starting remote node', totalNodes, 'via', h)
+                node_hosts = host_port_list
+                if self.use_multicast: node_hosts = None
+                newNode = h.remote_h2o(port=p, node_id=totalNodes, host_port_list=node_hosts, **kwargs)
                 node_list.append(newNode)
                 totalNodes += 1
                 # kbn try delay between each one?
@@ -402,7 +327,8 @@ def build_cloud(node_count=2, base_port=54321, hosts=None,
         # best to check for any errors due to cloud building right away?
         check_sandbox_for_errors()
 
-    except:
+    except Exception as e:
+        verboseprint("build_cloud error", e)
         if cleanup:
             for n in node_list: n.terminate()
         else:
@@ -413,30 +339,6 @@ def build_cloud(node_count=2, base_port=54321, hosts=None,
     # this is just in case they don't assign the return to the nodes global?
     nodes[:] = node_list
     return node_list
-
-def upload_jar_to_remote_hosts(hosts, slow_connection=False):
-    def prog(sofar, total):
-        # output is bad for jenkins. 
-        # ok to turn this off for all cases where we don't want a browser
-        if not browse_disable:
-            p = int(10.0 * sofar / total)
-            sys.stdout.write('\rUploading jar [%s%s] %02d%%' % ('#'*p, ' '*(10-p), 100*sofar/total))
-            sys.stdout.flush()
-        
-    if not slow_connection:
-        for h in hosts:
-            f = find_file('target/h2o.jar')
-            h.upload_file(f, progress=prog)
-            # skipping progress indicator for the flatfile
-            h.upload_file(flatfile_name())
-    else:
-        f = find_file('target/h2o.jar')
-        hosts[0].upload_file(f, progress=prog)
-        hosts[0].push_file_to_remotes(f, hosts[1:])
-
-        f = find_file(flatfile_name())
-        hosts[0].upload_file(f, progress=prog)
-        hosts[0].push_file_to_remotes(f, hosts[1:])
 
 def check_sandbox_for_errors():
     # dont' have both tearDown and tearDownClass report the same found error
@@ -619,17 +521,69 @@ def stabilize_cloud(node, node_count, timeoutSecs=14.0, retryDelaySecs=0.25):
             timeoutSecs=timeoutSecs, retryDelaySecs=retryDelaySecs)
 
 class H2O(object):
+    def __init__(self,
+        use_this_ip_addr=None, port=54321, host_port_list=None, capture_output=True, use_debugger=None,
+        use_hdfs=False,
+        # hdfs_version="cdh4", hdfs_name_node="192.168.1.151",
+        hdfs_version="cdh3u5", hdfs_name_node="192.168.1.176",
+        hdfs_config=None,
+        aws_credentials=None,
+        use_multicast=True,
+        java_heap_MB=None, java_heap_GB=None, java_extra_args=None, 
+        use_home_for_ice=False, node_id=None, username=None,
+        random_udp_drop=False,
+        inherit_io=False,
+        redirect_import_folder_to_s3_path=None,
+        ):
+
+        self.redirect_import_folder_to_s3_path = redirect_import_folder_to_s3_path
+
+        if use_debugger is None: use_debugger = debugger
+        self.aws_credentials = aws_credentials
+        self.port = port
+        self.host_port_list = host_port_list
+        # None is legal for self.addr. means we won't give an ip to the jar when we start, and it should
+        # figure out the right thing. Or we can say use use_this_ip_addr=127.0.0.1, or the known address 
+        # if use_this_addr is None, use 127.0.0.1 for urls and json
+        # Command line arg 'ipaddr' dominates:
+        if ipaddr:
+            self.addr = ipaddr
+        else:
+            self.addr = use_this_ip_addr
+
+        self.use_debugger = use_debugger
+        self.capture_output = capture_output
+
+        self.use_hdfs = use_hdfs
+        self.hdfs_name_node = hdfs_name_node
+        self.hdfs_version = hdfs_version
+        self.hdfs_config = hdfs_config
+
+        self.java_heap_GB = java_heap_GB
+        self.java_heap_MB = java_heap_MB
+        self.java_extra_args = java_extra_args
+
+        self.use_home_for_ice = use_home_for_ice
+        self.node_id = node_id
+        self.username = username
+
+        # don't want multiple reports from tearDown and tearDownClass
+        # have nodes[0] remember (0 always exists)
+        self.sandbox_error_was_reported = False
+        self.random_udp_drop = random_udp_drop
+        self.inherit_io = inherit_io
+
     def __url(self, loc, port=None):
         # always use the new api port
         if port is None: port = self.port
-        u = 'http://%s:%d/%s' % (self.http_addr, port, loc)
+        u = 'http://%s:%d/%s' % (self.node.address(), port, loc)
         return u 
 
     def __check_request(self, r, extraComment=None, ignoreH2oError=False):
         if extraComment:
-            log('Sent ' + r.url + " # " + extraComment)
+            log('Sent ' + str(r) + " # " + extraComment)
         else:
-            log('Sent ' + r.url)
+            log('Sent ' + str(r))
 
         # fatal if no response
         if not r: 
@@ -659,14 +613,17 @@ class H2O(object):
 
 
     def test_redirect(self):
-        return self.__check_request(requests.get(self.__url('TestRedirect.json')))
+        return self.__check_request(self.get(self.__url('TestRedirect.json')))
     def test_poll(self, args):
-        return self.__check_request(requests.get(
+        return self.__check_request(self.get(
                     self.__url('TestPoll.json'),
                     params=args))
 
+    def get(self, url, timeout=60, params=None):
+        return Request(url, params, http.get(url, timeout, params))
+
     def get_cloud(self):
-        a = self.__check_request(requests.get(self.__url('Cloud.json')))
+        a = self.__check_request(self.get(self.__url('Cloud.json')))
         consensus  = a['consensus']
         locked     = a['locked']
         cloud_size = a['cloud_size']
@@ -682,21 +639,21 @@ class H2O(object):
         return a
 
     def get_timeline(self):
-        return self.__check_request(requests.get(self.__url('Timeline.json')))
+        return self.__check_request(self.get(self.__url('Timeline.json')))
 
     # Shutdown url is like a reset button. Doesn't send a response before it kills stuff
     # safer if random things are wedged, rather than requiring response
     # so request library might retry and get exception. allow that.
     def shutdown_all(self):
         try:
-            self.__check_request(requests.get(self.__url('Shutdown.json')))
+            self.__check_request(self.get(self.__url('Shutdown.json')))
         except:
             pass
         return(True)
 
     def put_value(self, value, key=None, repl=None):
         return self.__check_request(
-            requests.get(
+            self.get(
                 self.__url('PutValue.json'), 
                 params={"value": value, "key": key, "replication_factor": repl}),
             extraComment = str(value) + "," + str(key) + "," + str(repl))
@@ -706,19 +663,16 @@ class H2O(object):
             key = os.path.basename(f)
             ### print "putfile specifying this key:", key
 
+        url = self.__url('PostFile.json')
         resp = self.__check_request(
-            requests.post(
-                self.__url('PostFile.json'),
-                timeout=timeoutSecs,
-                params={"key": key},
-                files={"file": open(f, 'rb')}),
+            Request(url, {"key": key}, http.post(url, timeoutSecs, {"key": key}, f)),
             extraComment = str(f))
 
         verboseprint("\nput_file response: ", dump_json(resp))
         return key
     
     def get_key(self, key):
-        return requests.get(self.__url('Get.html'),
+        return self.get(self.__url('Get.html'),
             params={"key": key})
 
     # noise is a 2-tuple ("StoreView", none) for url plus args for doing during poll to create noise
@@ -762,7 +716,7 @@ class H2O(object):
                 msgUsed = "\nPolling with"
 
             r = self.__check_request(
-                requests.get(
+                self.get(
                     url=urlUsed,
                     timeout=pollTimeoutSecs, 
                     params=paramsUsed))
@@ -804,7 +758,7 @@ class H2O(object):
         params_dict.update(kwargs)
         print "\nKMeans params list", params_dict
         a = self.__check_request(
-            requests.get(
+            self.get(
                 url=self.__url('KMeans.json'),
                 timeout=timeoutSecs,
                 params=params_dict))
@@ -839,7 +793,7 @@ class H2O(object):
         noise = kwargs.pop('noise', None)
 
         a = self.__check_request(
-            requests.get(
+            self.get(
                 url=self.__url('Parse.json'),
                 timeout=timeoutSecs,
                 params=params_dict))
@@ -864,15 +818,15 @@ class H2O(object):
             return a
 
     def netstat(self):
-        return self.__check_request(requests.get(self.__url('Network.json')))
+        return self.__check_request(self.get(self.__url('Network.json')))
 
     def jstack(self):
-        return self.__check_request(requests.get(self.__url("JStack.json")))
+        return self.__check_request(self.get(self.__url("JStack.json")))
 
     # &offset=
     # &view=
     def inspect(self, key, offset=None, view=None, ignoreH2oError=False):
-        a = self.__check_request(requests.get(self.__url('Inspect.json'),
+        a = self.__check_request(self.get(self.__url('Inspect.json'),
             params={
                 "key": key,
                 "offset": offset,
@@ -884,27 +838,33 @@ class H2O(object):
         ### verboseprint("\ninspect result:", dump_json(a))
         return a
 
+    # Parsing JSON can take long time when large, find error using string find instead
+    def inspect_no_json(self, key):
+        r = self.get(self.__url('Inspect.json'),
+            params={
+                "key": key,
+                "offset": -1,
+                })
+
+        if r.res.find('error') != -1:
+            raise Exception(emsg)
+
     # FIX! what params does this take
     def store_view(self):
-        a = self.__check_request(requests.get(self.__url('StoreView.json'),
+        a = self.__check_request(self.get(self.__url('StoreView.json'),
             params={}))
-        # too much!
-        ### verboseprint("\ninspect result:", dump_json(a))
         return a
 
     # There is also a RemoveAck in the browser, that asks for confirmation from
     # the user. This is after that confirmation.
     def remove_key(self, key):
-        a = self.__check_request(requests.get(self.__url('Remove.json'),
+        a = self.__check_request(self.get(self.__url('Remove.json'),
             params={"key": key}))
-
-        # too much!
-        ### verboseprint("\ninspect result:", dump_json(a))
         return a
 
     # H2O doesn't support yet?
     def Store2HDFS(self, key):
-        a = self.__check_request(requests.get(self.__url('Store2HDFS.json'),
+        a = self.__check_request(self.get(self.__url('Store2HDFS.json'),
             params={"key": key}))
         verboseprint("\ninspect result:", dump_json(a))
         return a
@@ -915,21 +875,21 @@ class H2O(object):
 
     # this can be used to import just a file or a whole folder
     def import_files(self, path):
-        a = self.__check_request(requests.get(
+        a = self.__check_request(self.get(
             self.__url('ImportFiles.json'),
             params={ "path": path}))
         verboseprint("\nimport_files result:", dump_json(a))
         return a
 
     def import_s3(self, bucket, repl=None):
-        a = self.__check_request(requests.get(
+        a = self.__check_request(self.get(
             self.__url('ImportS3.json'),
             params={"bucket": bucket}))
         verboseprint("\nimport_s3 result:", dump_json(a))
         return a
 
     def import_hdfs(self, path):
-        a = self.__check_request(requests.get(
+        a = self.__check_request(self.get(
             self.__url('ImportHdfs.json'),
             params={ "path": path}))
         verboseprint("\nimport_hdfs result:", dump_json(a))
@@ -943,7 +903,7 @@ class H2O(object):
         browseAlso = kwargs.pop('browseAlso',False)
         params_dict.update(kwargs)
         verboseprint("\nexec_query:", params_dict)
-        a = self.__check_request(requests.get(
+        a = self.__check_request(self.get(
             url=self.__url('Exec.json'),
             timeout=timeoutSecs,
             params=params_dict))
@@ -991,7 +951,7 @@ class H2O(object):
         browseAlso = kwargs.pop('browseAlso',False)
         params_dict.update(kwargs)
         print "\nrandom_forest parameters:", params_dict
-        a = self.__check_request(requests.get(
+        a = self.__check_request(self.get(
             url=self.__url('RF.json'),
             timeout=timeoutSecs,
             params=params_dict))
@@ -1019,7 +979,7 @@ class H2O(object):
         if print_params:
             print "\nrandom_forest_view parameters:", params_dict
 
-        a = self.__check_request(requests.get(
+        a = self.__check_request(self.get(
             self.__url('RFView.json'),
             timeout=timeoutSecs,
             params=params_dict))
@@ -1040,7 +1000,7 @@ class H2O(object):
         browseAlso = kwargs.pop('browseAlso',False)
         params_dict.update(kwargs)
 
-        a = self.__check_request(requests.get(
+        a = self.__check_request(self.get(
                 self.__url('RFTreeView.json'),
                 timeout=timeoutSecs,
                 params=params_dict),
@@ -1066,7 +1026,7 @@ class H2O(object):
         params_dict.update(kwargs)
         print "\nGLM params list", params_dict
 
-        a = self.__check_request(requests.get(
+        a = self.__check_request(self.get(
             self.__url(parentName + '.json'),
             timeout=timeoutSecs,
             params=params_dict))
@@ -1123,7 +1083,7 @@ class H2O(object):
         params_dict.update(kwargs)
         print "\nGLMScore params list", params_dict
 
-        a = self.__check_request(requests.get(
+        a = self.__check_request(self.get(
             self.__url('GLMScore.json'),
             timeout=timeoutSecs,
             params=params_dict))
@@ -1176,13 +1136,7 @@ class H2O(object):
             try:
                 n.get_cloud()
                 return True
-            except requests.ConnectionError, e:
-                # verboseprint("Connection error", e, "during wait_for_node_to_accept_connections")
-
-                # Now using: requests 1.1.0 (easy_install --upgrade requests) 2/5/13
-                # Now: assume all requests.ConnectionErrors are H2O legal connection errors.
-                # Have trouble finding where the errno is, fine to assume all are good ones.
-                # remember: we have a timeout check that will kick in if continued H2O badness.
+            except IOException:
                 return False
 
         self.stabilize(test, 'Cloud accepting connections',
@@ -1195,17 +1149,15 @@ class H2O(object):
             self.sandbox_error_was_reported = True
         return (self.sandbox_error_was_reported)
 
-    def get_args(self):
-        #! FIX! is this used for both local and remote? 
-        # I guess it doesn't matter if we use flatfile for both now
-        args = [ 'java' ]
+    def get_java_args(self):
+        args = []
 
         # defaults to not specifying
-	# FIX! we need to check that it's not outside the limits of the dram of the machine it's running on?
+        # FIX! we need to check that it's not outside the limits of the dram of the machine it's running on?
         if self.java_heap_GB is not None:
             if (1 > self.java_heap_GB > 63):
                 raise Exception('java_heap_GB <1 or >63  (GB): %s' % (self.java_heap_GB))
-            args += [ '-Xms%dG' % self.java_heap_GB ]
+            #args += [ '-Xms%dG' % self.java_heap_GB ]
             args += [ '-Xmx%dG' % self.java_heap_GB ]
 
         if self.java_heap_MB is not None:
@@ -1220,14 +1172,12 @@ class H2O(object):
 
         if self.use_debugger:
             args += ['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=8000']
+
         args += ["-ea"]
-        if self.classpath:
-            entries = [ find_file('build/classes'), find_file('lib/javassist.jar') ] 
-            entries += glob.glob(find_file('lib')+'/*/*.jar')
-            entries += glob.glob(find_file('lib')+'/*/*/*.jar')
-            args += ['-classpath', os.pathsep.join(entries), 'water.Boot']
-        else: 
-            args += ["-jar", self.get_h2o_jar()]
+        return args
+
+    def get_node_args(self):
+        args = []
 
         # H2O should figure it out, if not specified
         if self.addr is not None:
@@ -1235,15 +1185,20 @@ class H2O(object):
                 '--ip=%s' % self.addr,
                 ]
 
-        # Need to specify port, since there can be multiple ports for an ip in the flatfile
+        # Need to specify port, since there can be multiple ports for an ip
         if self.port is not None:
             args += [
                 "--port=%d" % self.port,
             ]
 
-        if self.use_flatfile:
+        if self.host_port_list is not None:
+            t = copy.copy(self.host_port_list)
+            random.shuffle(t)
+            hosts_value = ''
+            for hp in t:
+                hosts_value += hp[0].address() + ":" + str(hp[1]) + ','
             args += [
-                '--flatfile=' + self.flatfile,
+                '--hosts=' + hosts_value,
             ]
 
         args += [
@@ -1269,9 +1224,6 @@ class H2O(object):
                 '-hdfs_config ' + self.hdfs_config
             ]
 
-        if not self.sigar:
-            args += ['--nosigar']
-
         if self.aws_credentials:
             args += [ '--aws_credentials='+self.aws_credentials ]
 
@@ -1279,86 +1231,32 @@ class H2O(object):
         if self.random_udp_drop or random_udp_drop:
             args += ['--random_udp_drop']
 
+        args += ["--log_headers"]
         return args
 
-    def __init__(self, 
-        use_this_ip_addr=None, port=54321, capture_output=True, sigar=False, use_debugger=None, classpath=None,
-        use_hdfs=False, 
-        # hdfs_version="cdh4", hdfs_name_node="192.168.1.151", 
-        hdfs_version="cdh3u5", hdfs_name_node="192.168.1.176", 
-        hdfs_config=None,
-        aws_credentials=None,
-        use_flatfile=False, java_heap_GB=None, java_heap_MB=None, java_extra_args=None, 
-        use_home_for_ice=False, node_id=None, username=None,
-        random_udp_drop=False,
-        redirect_import_folder_to_s3_path=None,
-        ):
- 
-        self.redirect_import_folder_to_s3_path = redirect_import_folder_to_s3_path
-
-        if use_debugger is None: use_debugger = debugger
-        self.aws_credentials = aws_credentials
-        self.port = port
-        # None is legal for self.addr. means we won't give an ip to the jar when we start, and it should
-        # figure out the right thing. Or we can say use use_this_ip_addr=127.0.0.1, or the known address 
-        # if use_this_addr is None, use 127.0.0.1 for urls and json
-        # Command line arg 'ipaddr' dominates:
-        if ipaddr:
-            self.addr = ipaddr
-        else:
-            self.addr = use_this_ip_addr
-
-        if use_this_ip_addr is not None:
-            self.http_addr = use_this_ip_addr
-        else:
-            self.http_addr = get_ip_address()
-
-        self.sigar = sigar
-        self.use_debugger = use_debugger
-        self.classpath = classpath
-        self.capture_output = capture_output
-
-        self.use_hdfs = use_hdfs
-        self.hdfs_name_node = hdfs_name_node
-        self.hdfs_version = hdfs_version
-        self.hdfs_config = hdfs_config
-
-        self.use_flatfile = use_flatfile
-        self.java_heap_GB = java_heap_GB
-        self.java_heap_MB = java_heap_MB
-        self.java_extra_args = java_extra_args
-
-        self.use_home_for_ice = use_home_for_ice
-        self.node_id = node_id
-        self.username = username
-
-        # don't want multiple reports from tearDown and tearDownClass
-        # have nodes[0] remember (0 always exists)
-        self.sandbox_error_was_reported = False
-        self.random_udp_drop = random_udp_drop
-
     def __str__(self):
-        return '%s - http://%s:%d/' % (type(self), self.http_addr, self.port)
+        return '%s - http://%s:%d/' % (type(self), self.node.address(), self.port)
 
     def get_ice_dir(self):
         raise Exception('%s must implement %s' % (type(self), inspect.stack()[0][3]))
 
-    def get_h2o_jar(self):
-        raise Exception('%s must implement %s' % (type(self), inspect.stack()[0][3]))
-
     def is_alive(self):
-        raise Exception('%s must implement %s' % (type(self), inspect.stack()[0][3]))
+        return self.node.isAlive()
 
     def terminate(self):
-        raise Exception('%s must implement %s' % (type(self), inspect.stack()[0][3]))
+        self.shutdown_all()
+        
+        # we need a delay after shutdown_all above, before this check?
+        time.sleep(1)
+        if self.is_alive():
+            print "\nShutdown didn't work for local node: %s, killing." % self
+
+        return self.node.kill()
 
 class ExternalH2O(H2O):
     '''An H2O instance launched outside the control of python'''
     def __init__(self, *args, **kwargs):
         super(ExternalH2O, self).__init__(*args, **kwargs)
-
-    def get_h2o_jar(self):
-        return find_file('target/h2o.jar') # just a likely guess
 
     def get_ice_dir(self):
         return '/tmp/ice%d' % self.port # just a likely guess
@@ -1370,239 +1268,117 @@ class ExternalH2O(H2O):
         except:
             return False
 
-    def terminate(self):
-        # try/except for this is inside shutdown_all now
-        self.shutdown_all()
-        if self.is_alive():
-            raise Exception('Unable to terminate externally launched node: %s' % self)
+class InProcessH2O(H2O):
+    '''An H2O instance launched in a classloader in the current JVM'''
+    def __init__(self):
+        super(InProcessH2O, self).__init__()
+        self.rc = None
+        # FIX! no option for local /home/username ..always the sandbox (LOG_DIR)
+        self.ice = tmp_dir('ice.')
+        if self.node_id is not None:
+            logPrefix = 'in-process-h2o-' + str(self.node_id)
+        else:
+            logPrefix = 'in-process-h2o'
+        check_port_group(self.port)
+        self.node = NodeCL(self.get_node_args());
+        self.node.start();
 
+    def get_ice_dir(self):
+        return self.ice
 
 class LocalH2O(H2O):
-    '''An H2O instance launched by the python framework on the local host using psutil'''
+    '''An H2O instance launched on the local host'''
     def __init__(self, *args, **kwargs):
         super(LocalH2O, self).__init__(*args, **kwargs)
         self.rc = None
         # FIX! no option for local /home/username ..always the sandbox (LOG_DIR)
         self.ice = tmp_dir('ice.')
-        self.flatfile = flatfile_name()
+        self.node = NodeVM(self.get_java_args(), self.get_node_args());
+
         if self.node_id is not None:
             logPrefix = 'local-h2o-' + str(self.node_id)
         else:
             logPrefix = 'local-h2o'
-        check_port_group(self.port)
-        spawn = spawn_cmd(logPrefix, self.get_args(), capture_output=self.capture_output)
-        self.ps = spawn[0]
+        outfd,outpath = tmp_file(logPrefix + '.stdout.', '.log')
+        errfd,errpath = tmp_file(logPrefix + '.stderr.', '.log')
+        self.node.persistIO(outpath, errpath);
 
-    def get_h2o_jar(self):
-        return find_file('target/h2o.jar')
+        comment = 'stdout %s, stderr %s' % (os.path.basename(outpath), os.path.basename(errpath))        
+        log(' '.join(args), comment=comment)
 
-    def get_flatfile(self):
-        return self.flatfile
-        # return find_file(flatfile_name())
+        if self.inherit_io:
+            self.node.inheritIO();
+
+        self.node.start();
 
     def get_ice_dir(self):
         return self.ice
 
-    def is_alive(self):
-        verboseprint("Doing is_alive check for LocalH2O", self.wait(0))
-        return self.wait(0) is None
-    
-    def terminate(self):
-        # send a shutdown request first. This matches ExternalH2O
-        # since local is used for a lot of buggy new code, also do the ps kill.
-        # try/except inside shutdown_all now
-        self.shutdown_all()
-
-        # we need a delay after shutdown_all above, before this check?
-        time.sleep(1)
-        if self.is_alive():
-            print "\nShutdown didn't work for local node? : %s. Will kill though" % self
-
-        try:
-            if self.is_alive(): self.ps.kill()
-            if self.is_alive(): self.ps.terminate()
-            return self.wait(0.5)
-        except psutil.NoSuchProcess:
-            return -1
-
-    def wait(self, timeout=0):
-        if self.rc is not None: return self.rc
-        try:
-            self.rc = self.ps.wait(timeout)
-            return self.rc
-        except psutil.TimeoutExpired:
-            return None
-
     def stack_dump(self):
         self.ps.send_signal(signal.SIGQUIT)
 
-class RemoteHost(object):
-    def upload_file(self, f, progress=None):
-        # FIX! we won't find it here if it's hdfs://192.168.1.151/ file
-        f = find_file(f)
-        if f not in self.uploaded:
-            import md5
-            m = md5.new()
-            m.update(open(f).read())
-            m.update(getpass.getuser())
-            dest = '/tmp/' +m.hexdigest() +"-"+ os.path.basename(f)
-
-            # sigh. we rm/create sandbox in build_cloud now 
-            # (because nosetests doesn't exec h2o_main and we 
-            # don't want to code "clean_sandbox()" in all the tests.
-            # So: we don't have a sandbox here, or if we do, we're going to delete it.
-            # Just don't log anything until build_cloud()? that should be okay?
-            # we were just logging this upload message..not needed.
-            # log('Uploading to %s: %s -> %s' % (self.http_addr, f, dest))
-
-            sftp = self.ssh.open_sftp()
-            # check if file exists on remote side
-            try:
-                sftp.stat(dest)
-                print "Skipping upload of file {0} because file {1} exists on remote side!".format(f, dest)
-            except IOError, e:
-                if e.errno == errno.ENOENT:
-                    sftp.put(f, dest, callback=progress)
-            finally:
-                sftp.close()
-            self.uploaded[f] = dest
-        return self.uploaded[f]
-
-    def record_file(self, f, dest):
-        '''Record a file as having been uploaded by external means'''
-        self.uploaded[f] = dest
-
-    def run_cmd(self, cmd):
-        log('Running `%s` on %s' % (cmd, self))
-        (stdin, stdout, stderr) = self.ssh.exec_command(cmd)
-        stdin.close()
-
-        sys.stdout.write(stdout.read())
-        sys.stdout.flush()
-        stdout.close()
-
-        sys.stderr.write(stderr.read())
-        sys.stderr.flush()
-        stderr.close()
-
-    def push_file_to_remotes(self, f, hosts):
-        dest = self.uploaded[f]
-        for h in hosts:
-            if h == self: continue
-            self.run_cmd('scp %s %s@%s:%s' % (dest, h.username, h.addr, dest))
-            h.record_file(f, dest)
-
-    def __init__(self, addr, username, password=None, **kwargs):
-        import paramiko
-        # To debug paramiko you can use the following code:
-        #paramiko.util.log_to_file('/tmp/paramiko.log')
-        #paramiko.common.logging.basicConfig(level=paramiko.common.DEBUG)
-        self.addr = addr
-        self.http_addr = addr
-        self.username = username
-        self.ssh = paramiko.SSHClient()
-
-        # don't require keys. If no password, assume passwordless setup was done
-        policy = paramiko.AutoAddPolicy()
-        self.ssh.set_missing_host_key_policy(policy)
-        self.ssh.load_system_host_keys()
-        if password is None:
-            self.ssh.connect(self.addr, username=username, **kwargs)
-        else:
-            self.ssh.connect(self.addr, username=username, password=password, **kwargs)
-
-        # keep connection - send keepalive packet evety 5minutes
-        self.ssh.get_transport().set_keepalive(300)
-        self.uploaded = {}
+class RemoteHost(Host):
+    def __init__(self, addr, user, key, **kwargs):
+        super(RemoteHost, self).__init__(addr, user, key)
 
     def remote_h2o(self, *args, **kwargs):
-        return RemoteH2O(self, self.addr, *args, **kwargs)
-
-    def open_channel(self):
-        # kbn
-        # ch = self.ssh.invoke_shell()
-        ch = self.ssh.get_transport().open_session()
-        ch.get_pty() # force the process to die without the connection
-        return ch
+        return RemoteH2O(self, *args, **kwargs)
 
     def __str__(self):
-        return 'ssh://%s@%s' % (self.username, self.addr)
-
+        return 'ssh://%s@%s' % (self.user(), self.address())
 
 class RemoteH2O(H2O):
-    '''An H2O instance launched by the python framework on a specified host using openssh'''
+    '''An H2O instance launched on a specified host'''
     def __init__(self, host, *args, **kwargs):
         super(RemoteH2O, self).__init__(*args, **kwargs)
 
-        self.jar = host.upload_file('target/h2o.jar')
-        # need to copy the flatfile. We don't always use it (depends on h2o args)
-        self.flatfile = host.upload_file(flatfile_name())
         # distribute AWS credentials
         if self.aws_credentials:
-            self.aws_credentials = host.upload_file(self.aws_credentials)
+            host.rsync({ self.aws_credentials }, None)
+            self.aws_credentials = "/home/" + host.user() + '/' + Host.FOLDER + '/' + basename(self.aws_credentials)
 
         if self.hdfs_config:
             self.hdfs_config = host.upload_file(self.hdfs_config)
 
         if self.use_home_for_ice:
             # this will be the username used to ssh to the host
-            self.ice = "/home/" + host.username + '/ice.%d.%s' % (self.port, time.time())
+            self.ice = "/home/" + host.user() + '/ice.%d.%s' % (self.port, time.time())
         else:
             self.ice = '/tmp/ice.%d.%s' % (self.port, time.time())
 
-        self.channel = host.open_channel()
-        ### FIX! TODO...we don't check on remote hosts yet
-       
-        # this fires up h2o over there
-        cmd = ' '.join(self.get_args())
-        self.channel.exec_command(cmd)
-        if self.capture_output:
-            if self.node_id is not None:
-                logPrefix = 'remote-h2o-' + str(self.node_id)
-            else:
-                logPrefix = 'remote-h2o'
-
-            outfd,outpath = tmp_file(logPrefix + '.stdout.', '.log')
-            errfd,errpath = tmp_file(logPrefix + '.stderr.', '.log')
-
-            drain(self.channel.makefile(), outfd)
-            drain(self.channel.makefile_stderr(), errfd)
-            comment = 'Remote on %s, stdout %s, stderr %s' % (
-                self.addr, os.path.basename(outpath), os.path.basename(errpath))
+        self.node = NodeHost(host, self.get_java_args(), self.get_node_args())
+        if self.node_id is not None:
+            logPrefix = 'ssh-h2o-' + str(self.node_id)
         else:
-            drain(self.channel.makefile(), sys.stdout)
-            drain(self.channel.makefile_stderr(), sys.stderr)
-            comment = 'Remote on %s' % self.addr
+            logPrefix = 'ssh-h2o'
+        outfd,outpath = tmp_file(logPrefix + '.stdout.', '.log')
+        errfd,errpath = tmp_file(logPrefix + '.stderr.', '.log')
+        self.node.persistIO(outpath, errpath);
 
-        log(cmd, comment=comment)
+        comment = 'stdout %s, stderr %s' % (os.path.basename(outpath), os.path.basename(errpath))        
+        log(' '.join(args), comment=comment)
 
-    def get_h2o_jar(self):
-        return self.jar
+        if self.inherit_io:
+            self.node.inheritIO();
 
-    def get_flatfile(self):
-        return self.flatfile
+        self.node.start();
 
     def get_ice_dir(self):
         return self.ice
 
-    def is_alive(self):
-        verboseprint("Doing is_alive check for RemoteH2O")
-        if self.channel.closed: return False
-        if self.channel.exit_status_ready(): return False
-        try:
-            self.get_cloud()
-            return True
-        except:
-            return False
+class Request:
+    def __init__(self, url, params, res):
+        self.url = url
+        self.params = params
+        self.res = res
 
-    def terminate(self):
-        self.shutdown_all()
-        self.channel.close()
-        # kbn: it should be dead now? want to make sure we don't have zombies
-        # we should get a connection error. doing a is_alive subset.
-        try:
-            gc_output = self.get_cloud()
-            raise Exception("get_cloud() should fail after we terminate a node. It isn't. %s %s" % (self, gc_output))
-        except:
-            return True
-    
+    def json(self):
+        return json.loads(self.res)
+
+    def __str__(self):
+        s =  self.url
+        if(self.params is not None):
+            s += '?'
+            for k in self.params:
+                s += k + '=' + str(self.params[k]) + '&'
+        return s

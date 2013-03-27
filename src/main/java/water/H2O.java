@@ -14,6 +14,8 @@ import water.nbhm.NonBlockingHashMap;
 import water.store.s3.PersistS3;
 import water.util.Utils;
 
+import com.amazonaws.auth.PropertiesCredentials;
+import com.google.common.base.Objects;
 import com.google.common.io.Closeables;
 
 /**
@@ -476,7 +478,7 @@ public final class H2O {
   public static OptArgs OPT_ARGS = new OptArgs();
   public static class OptArgs extends Arguments.Opt {
     public String name; // set_cloud_name_and_mcast()
-    public String flatfile; // set_cloud_name_and_mcast()
+    public String hosts; // List of other nodes in this cloud
     public int port; // set_cloud_name_and_mcast()
     public String ip; // Named IP4/IP6 address instead of the default
     public String ice_root; // ice root directory
@@ -522,6 +524,13 @@ public final class H2O {
     Function.initializeCommonFunctions();
   }
 
+  // Default location of the AWS credentials file
+  private static final String DEFAULT_CREDENTIALS_LOCATION = "AwsCredentials.properties";
+  public static PropertiesCredentials getAWSCredentials() throws IOException {
+    File credentials = new File(Objects.firstNonNull(OPT_ARGS.aws_credentials, DEFAULT_CREDENTIALS_LOCATION));
+    return new PropertiesCredentials(credentials);
+  }
+
   /** Starts the local k-v store.
 * Initializes the local k-v store, local node and the local cloud with itself
 * as the only member.
@@ -535,15 +544,15 @@ public final class H2O {
     // Do not forget to put SELF into the static configuration (to simulate
     // proper multicast behavior)
     if( STATIC_H2OS != null && !STATIC_H2OS.contains(SELF)) {
-      System.err.println("[h2o] *WARNING* flatfile configuration does not include self: " + SELF);
-      System.err.println("[h2o] *WARNING* flatfile contains: " + STATIC_H2OS);
+      System.err.println("[h2o] *WARNING* -hosts argument does not include self: " + SELF);
+      System.err.println("[h2o] *WARNING* -hosts argument contains: " + STATIC_H2OS);
       STATIC_H2OS.add(SELF);
     }
 
     System.out.println("[h2o] ("+VERSION+") '"+NAME+"' on " + SELF+
-                       (OPT_ARGS.flatfile==null
+                       (OPT_ARGS.hosts==null
                         ? (", discovery address "+CLOUD_MULTICAST_GROUP+":"+CLOUD_MULTICAST_PORT)
-                        : ", static configuration based on -flatfile "+OPT_ARGS.flatfile));
+                        : (", static configuration based on -hosts: "+OPT_ARGS.hosts)));
 
     // Create the starter Cloud with 1 member
     SELF._heartbeat._jar_md5 = Boot._init._jarHash;
@@ -608,8 +617,8 @@ public final class H2O {
 
 
   // Parse arguments and set cloud name in any case. Strip out "-name NAME"
-  // and "-flatfile <filename>". Ignore the rest. Set multi-cast port as a hash
-  // function of the name. Parse node ip addresses from the filename.
+  // and "-hosts". Ignore the rest. Set multi-cast port as a hash function of
+  // the name. Parse node ip addresses from the filename.
   static void initializeNetworkSockets( ) {
     // Assign initial ports
     InetAddress inet = findInetAddressForSelf();
@@ -652,8 +661,8 @@ public final class H2O {
     System.out.println("[h2o]\t\thttp:/"+inet+":"+_apiSocket.getLocalPort()+"/");
 
     NAME = OPT_ARGS.name==null? System.getProperty("user.name") : OPT_ARGS.name;
-    // Read a flatfile of allowed nodes
-    STATIC_H2OS = parseFlatFile(OPT_ARGS.flatfile);
+    // Read allowed hosts
+    STATIC_H2OS = parseHosts(OPT_ARGS.hosts);
 
     // Multi-cast ports are in the range E1.00.00.00 to EF.FF.FF.FF
     int hash = NAME.hashCode()&0x7fffffff;
@@ -700,23 +709,23 @@ public final class H2O {
 
     } else {                    // Multicast Simulation
       // The multicast simulation is little bit tricky. To achieve union of all
-      // specified nodes' flatfiles (via option -flatfile), the simulated
+      // specified nodes' hosts (via option -hosts), the simulated
       // multicast has to send packets not only to nodes listed in the node's
-      // flatfile (H2O.STATIC_H2OS), but also to all cloud members (they do not
-      // need to be specified in THIS node's flatfile but can be part of cloud
-      // due to another node's flatfile).
+      // hosts (H2O.STATIC_H2OS), but also to all cloud members (they do not
+      // need to be specified in THIS node's hosts but can be part of cloud
+      // due to another node's hosts).
       //
       // Furthermore, the packet have to be send also to Paxos proposed members
       // to achieve correct functionality of Paxos.  Typical situation is when
       // this node receives a Paxos heartbeat packet from a node which is not
-      // listed in the node's flatfile -- it means that this node is listed in
-      // another node's flatfile (and wants to create a cloud).  Hence, to
+      // listed in the node's hosts -- it means that this node is listed in
+      // another node's hosts (and wants to create a cloud).  Hence, to
       // allow cloud creation, this node has to reply.
       //
       // Typical example is:
-      //    node A: flatfile (B)
-      //    node B: flatfile (C), i.e., A -> (B), B-> (C), C -> (A)
-      //    node C: flatfile (A)
+      //    node A: hosts (B)
+      //    node B: hosts (C), i.e., A -> (B), B-> (C), C -> (A)
+      //    node C: hosts (A)
       //    Cloud configuration: (A, B, C)
       //
 
@@ -739,53 +748,29 @@ public final class H2O {
 
 
   /**
-   * Read a set of Nodes from a file. Format is:
+   * Read a set of hosts from arguments. Format is:
    *
-   * name/ip_address:port
-   * - name is unused and optional
+   * ip:port,ip:port,...
    * - port is optional
-   * - leading '#' indicates a comment
    *
    * For example:
    *
-   * 10.10.65.105:54322
-   * # disabled for testing
-   * # 10.10.65.106
-   * /10.10.65.107
-   * # run two nodes on 108
-   * 10.10.65.108:54322
-   * 10.10.65.108:54325
+   * 10.10.65.105:54322,10.10.65.107
    */
-  private static HashSet<H2ONode> parseFlatFile( String fname ) {
-    if( fname == null ) return null;
-    File f = new File(fname);
-    if( !f.exists() ) return null; // No flat file
+  private static HashSet<H2ONode> parseHosts( String hosts ) {
+    if( hosts == null ) return null;
     HashSet<H2ONode> h2os = new HashSet<H2ONode>();
     BufferedReader br = null;
     int port = DEFAULT_PORT;
     try {
-      br = new BufferedReader(new InputStreamReader(new FileInputStream(f)));
-      String strLine = null;
-      while( (strLine = br.readLine()) != null) {
-        strLine = strLine.trim();
-        // be user friendly and skip comments and empty lines
-        if (strLine.startsWith("#") || strLine.isEmpty()) continue;
-
+      for(String host : hosts.split(",")) {
         String ip = null, portStr = null;
-        int slashIdx = strLine.indexOf('/');
-        int colonIdx = strLine.indexOf(':');
-        if( slashIdx == -1 && colonIdx == -1 ) {
-          ip = strLine;
-        } else if( slashIdx == -1 ) {
-          ip = strLine.substring(0, colonIdx);
-          portStr = strLine.substring(colonIdx+1);
-        } else if( colonIdx == -1 ) {
-          ip = strLine.substring(slashIdx+1);
-        } else if( slashIdx > colonIdx ) {
-          Log.die("Invalid format, must be name/ip[:port], not '"+strLine+"'");
-        } else {
-          ip = strLine.substring(slashIdx+1, colonIdx);
-          portStr = strLine.substring(colonIdx+1);
+        int colonIdx = host.indexOf(':');
+        if( colonIdx == -1 )
+          ip = host;
+         else {
+          ip = host.substring(0, colonIdx);
+          portStr = host.substring(colonIdx+1);
         }
 
         InetAddress inet = InetAddress.getByName(ip);

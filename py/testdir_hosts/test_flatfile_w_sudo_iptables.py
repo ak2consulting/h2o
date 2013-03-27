@@ -108,53 +108,53 @@ class Basic(unittest.TestCase):
         showIptables()
 
     def test_A(self):
-        print "\nno flatfile, Build allowing anything"
+        print "\nuse_multicast=true, Build allowing anything"
         allAcceptIptables()
         showIptables()
-        h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_flatfile=False)
+        h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_multicast=True)
         h2o.tear_down_cloud()
 
     def test_B(self):
-        print "\nwith flatfile, Build allowing anything"
+        print "\nuse_multicast=false, Build allowing anything"
         allAcceptIptables()
         showIptables()
-        h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_flatfile=True)
+        h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_multicast=False)
         h2o.tear_down_cloud()
 
     def test_C_no_mc_rcv(self):
-        print "\nwith flatfile, with multicast disabled"
+        print "\nuse_multicast=false, with multicast disabled"
         allAcceptIptables()
         multicastDropReceiveIptables()
         showIptables()
-        h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_flatfile=True)
+        h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_multicast=False)
         h2o.tear_down_cloud()
 
     def test_D_no_mc_snd(self):
-        print "\nwith flatfile, with multicast disabled"
+        print "\nuse_multicast=false, with multicast disabled"
         allAcceptIptables()
         multicastBlockSendIptables()
         showIptables()
-        h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_flatfile=True)
+        h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_multicast=False)
         h2o.tear_down_cloud()
 
     def test_E_no_mc_snd_no_mc_rcv(self):
-        print "\nwith flatfile, with multicast disabled"
+        print "\nuse_multicast=false, with multicast disabled"
         allAcceptIptables()
         multicastDropReceiveIptables()
         multicastBlockSendIptables()
         showIptables()
-        h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_flatfile=True)
+        h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_multicast=False)
         h2o.tear_down_cloud()
 
     def test_F_no_mc_loop(self):
-        print "\nwith flatfile, with multicast disabled, and RF, 5 trials"
+        print "\nuse_multicast=false, with multicast disabled, and RF, 5 trials"
         allAcceptIptables()
         multicastDropReceiveIptables()
         showIptables()
         csvPathname = h2o.find_file('smalldata/poker/poker1000')
 
         for x in range(1,5):
-            h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_flatfile=True)
+            h2o_hosts.build_cloud_with_hosts(nodes_per_host, use_multicast=False)
             h2o_cmd.runRF(trees=50, timeoutSecs=10, csvPathname=csvPathname)
             h2o.tear_down_cloud()
             h2o.verboseprint("Waiting", nodes_per_host,

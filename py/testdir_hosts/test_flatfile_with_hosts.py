@@ -10,7 +10,7 @@ class Basic(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        h2o_hosts.build_cloud_with_hosts(2,use_flatfile=True)
+        h2o_hosts.build_cloud_with_hosts(2,use_multicast=False)
 
     @classmethod
     def tearDownClass(cls):
@@ -36,7 +36,7 @@ class Basic(unittest.TestCase):
         for x in xrange (11,100,10):
             # Have to split the string out to list for pipe
             shCmdString = "perl " + h2o.find_file("syn_scripts/parity.pl") + " 128 4 "+ str(x) + " quad"
-            h2o.spawn_cmd_and_wait('parity.pl', shCmdString.split(),timeout=30)
+            h2o.spawn_cmd_and_wait('parity.pl', shCmdString.split())
             # the algorithm for creating the path and filename is hardwired in parity.pl..i.e
             csvFilename = "parity_128_4_" + str(x) + "_quad.data"  
 

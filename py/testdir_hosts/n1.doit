@@ -1,3 +1,2 @@
-
 sleep 10
-nosetests ../testdir_multi_jvm/$1 --nologcapture --with-xunit --xunit-file=$1.nosetests.xml
+../jy ../nosetests.py ../testdir_multi_jvm/$1 --nologcapture --with-xunit --xunit-file=$1.nosetests.xml

@@ -53,7 +53,7 @@ class Basic(unittest.TestCase):
         print "\nUsing random seed:", SEED
         localhost = h2o.decide_if_localhost()
         if (localhost):
-            h2o.build_cloud(1,use_flatfile=True)
+            h2o.build_cloud(1,use_multicast=True)
         else:
             h2o_hosts.build_cloud_with_hosts()
 

@@ -1,6 +1,8 @@
 import os, json, unittest, time, shutil, sys, getpass
 import h2o
 
+from water.sys import VM
+
 class PetaTest(unittest.TestCase):
 
     def testAll(self):
@@ -14,7 +16,7 @@ class PetaTest(unittest.TestCase):
                     'java',
                     '-Dh2o.arg.ice_root='+h2o.tmp_dir('ice.'),
                     '-Dh2o.arg.name=pytest-'+getpass.getuser(),
-                    '-Dh2o.arg.ip='+h2o.get_ip_address(),
+                    '-Dh2o.arg.ip='+VM.localIP(),
                     '-ea', '-jar', h2o.find_file('target/h2o.jar'),
                     '-mainClass', 'org.junit.runner.JUnitCore',
                     # The tests
