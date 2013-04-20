@@ -396,12 +396,14 @@ public final class H2O {
     private final int _cap;
     FJWThrFact( int cap ) { _cap = cap; }
     public ForkJoinWorkerThread newThread(ForkJoinPool pool) {
-      return pool.getPoolSize() <= _cap ? new FJWThr(pool) : null;
+      int psz = pool.getPoolSize();
+      Log.unwrap(System.err,"Capping @ "+_cap+" psz="+psz+" prior="+((ForkJoinPool2)pool)._priority);
+      return psz <= _cap ? new FJWThr(pool) : null;
     }
   }
 
   // A standard FJ Pool, with an expected priority level.
-  private static class ForkJoinPool2 extends ForkJoinPool {
+  public static class ForkJoinPool2 extends ForkJoinPool {
     public final int _priority;
     ForkJoinPool2(int p, int cap) { super(NUMCPUS,new FJWThrFact(cap),null,p!=MIN_PRIORITY); _priority = p; }
     public H2OCountedCompleter poll() { return (H2OCountedCompleter)pollSubmission(); }
@@ -413,12 +415,12 @@ public final class H2O {
   // Capped at a small number of threads per pool.
   private static final ForkJoinPool2 FJPS[] = new ForkJoinPool2[MAX_PRIORITY+1];
   static {
-    // Only need 1 thread for the AckAck work, as it cannot block
-    FJPS[ACK_ACK_PRIORITY] = new ForkJoinPool2(ACK_ACK_PRIORITY,1);
+    FJPS[0] = FJP_NORM;
+    FJPS[GUI_PRIORITY] = new ForkJoinPool2(GUI_PRIORITY,2);
     for( int i=MIN_HI_PRIORITY+1; i<MAX_PRIORITY; i++ )
       FJPS[i] = new ForkJoinPool2(i,NUMCPUS); // All CPUs, but no more for blocking purposes
-    FJPS[GUI_PRIORITY] = new ForkJoinPool2(GUI_PRIORITY,2);
-    FJPS[0] = FJP_NORM;
+    // Only need 1 thread for the AckAck work, as it cannot block
+    FJPS[ACK_ACK_PRIORITY] = new ForkJoinPool2(ACK_ACK_PRIORITY,1);
   }
 
   // Easy peeks at the low FJ queue

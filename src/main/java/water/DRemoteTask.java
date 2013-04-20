@@ -1,10 +1,11 @@
 package water;
+
+import com.google.common.base.Throwables;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-
-import com.google.common.base.Throwables;
+import jsr166y.*;
 
 /**  A Distributed DTask.
  * Execute a set of Keys on the home for each Key.
@@ -88,6 +89,24 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
     return f;             // Block for results from the log-tree splits
   }
 
+  public static void PrintFJ() {
+    if( Thread.currentThread() instanceof ForkJoinWorkerThread ) {
+      ForkJoinWorkerThread fjwt = (ForkJoinWorkerThread)Thread.currentThread();
+      ForkJoinPool q = fjwt.getPool();
+      H2O.ForkJoinPool2 p = (H2O.ForkJoinPool2)q;
+      Log.unwrap(System.err,
+                 " actc="+p.getActiveThreadCount()+
+                 " asm="+p.getAsyncMode()+
+                 " par="+p.getParallelism()+
+                 " psz="+p.getPoolSize()+
+                 " pqsub="+p.getQueuedSubmissionCount()+
+                 " pqtsk="+p.getQueuedTaskCount()+
+                 " pqrun="+p.getRunningThreadCount()+
+                 " prior="+p._priority+
+                 "");
+    }
+  }
+
   // Junk class only used to allow blocking all results, both local & remote
   public class DFuture {
     private final RPC<DRemoteTask> _lo, _hi;
@@ -97,8 +116,10 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
     // Block until completed, without having to catch exceptions
     public DRemoteTask get() {
       try {
-        if( _keys.length != 0 )
+        if( _keys.length != 0 ) {
+          PrintFJ();
           DRemoteTask.this.get(); // Block until the self-task is done
+        }
       } catch( InterruptedException ie ) {
         throw new RuntimeException(ie);
       } catch( ExecutionException ee ) {

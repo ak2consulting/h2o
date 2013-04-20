@@ -51,8 +51,9 @@ public abstract class MRTask extends DRemoteTask {
       // operation, the min memory is proportional to the depth of the right
       // subtree.
       long reqMem = (log2(_hi - mid)+3)*memOverheadPerChunk();
-      if(MemoryManager.tryReserveTaskMem(reqMem)){
+      if(true && MemoryManager.tryReserveTaskMem(reqMem)){
         _reservedMem += reqMem;   // Remember the amount of reserved memory to free it later.
+        DRemoteTask.PrintFJ();
         _left.fork();             // Runs in another thread/FJ instance
       } else {
         _left.compute2();
