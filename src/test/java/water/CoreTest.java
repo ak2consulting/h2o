@@ -10,7 +10,6 @@ public class CoreTest extends TestUtil {
 
   @BeforeClass public static void stall() { stall_till_cloudsize(2); }
 
-
   static int RUNTIME=30*1000;
   static int MAPTIME=1000;
 
@@ -18,13 +17,16 @@ public class CoreTest extends TestUtil {
     int jobs = H2O.NUMCPUS*RUNTIME/MAPTIME;
     // Target all keys remotely: the bug is that the *remote* JVM loses a core
     // to the DRemoteTask.
-    H2O cloud = H2O.CLOUD;
-    H2ONode target = cloud._memary[0];
-    if( target == H2O.SELF ) target = cloud._memary[1];
+    //H2O cloud = H2O.CLOUD;
+    //H2ONode target = cloud._memary[0];
+    //if( target == H2O.SELF ) target = cloud._memary[1];
     Key[] keys = new Key[jobs];
     for( int i=0; i<keys.length; i++ )
-      keys[i] = Key.make("CPU"+i,(byte)1,Key.DFJ_INTERNAL_USER,target);
+      //keys[i] = Key.make("CPU"+i,(byte)1,Key.DFJ_INTERNAL_USER,target);
+      keys[i] = Key.make("CPU"+i);
     long start = System.currentTimeMillis();
+    //FJPacket fjp = new FJPacket();
+    //FJPNorm.submit(fjp);
     new CPULoad().invoke(keys);
     long now=System.currentTimeMillis();
     Log.unwrap(System.err,"Runtime= "+(now-start)+" Jobs="+jobs+" maptime="+MAPTIME);

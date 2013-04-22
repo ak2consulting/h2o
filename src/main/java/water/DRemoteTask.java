@@ -84,7 +84,7 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
     _keys = locals.toArray(new Key[locals.size()]); // Keys, including local keys (if any)
     if( _keys.length != 0 ) {   // Shortcut for no local work
       init();                   // One-time top-level init
-      H2O.submitTask(this);// Begin normal execution on a FJ thread
+      H2O.submitTask(this);     // Begin normal execution on a FJ thread
     }
     return f;             // Block for results from the log-tree splits
   }
@@ -117,7 +117,7 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
     public DRemoteTask get() {
       try {
         if( _keys.length != 0 ) {
-          PrintFJ();
+          //PrintFJ();
           DRemoteTask.this.get(); // Block until the self-task is done
         }
       } catch( InterruptedException ie ) {

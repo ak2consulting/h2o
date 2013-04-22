@@ -53,7 +53,7 @@ public abstract class MRTask extends DRemoteTask {
       long reqMem = (log2(_hi - mid)+3)*memOverheadPerChunk();
       if(true && MemoryManager.tryReserveTaskMem(reqMem)){
         _reservedMem += reqMem;   // Remember the amount of reserved memory to free it later.
-        DRemoteTask.PrintFJ();
+        //DRemoteTask.PrintFJ();
         _left.fork();             // Runs in another thread/FJ instance
       } else {
         _left.compute2();
